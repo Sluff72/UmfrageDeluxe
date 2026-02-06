@@ -12,7 +12,7 @@ declare global {
 
 export function requireRole(...allowedRoles: SurveyRole[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const surveyId = req.params.id;
+    const surveyId = req.params.id as string | undefined;
 
     if (!surveyId) {
       res.status(400).json({ error: 'Survey ID is required' });

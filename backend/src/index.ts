@@ -10,6 +10,7 @@ import { runInitialMigration } from './db/migrations/001_initial';
 import { setupSocketServer } from './socket/index';
 import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
+import { surveyRouter } from './routes/survey.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 
@@ -31,6 +32,7 @@ console.log('Database initialized and migrations applied.');
 // Routes
 app.use('/api', healthRouter);
 app.use('/api', authRouter);
+app.use('/api', surveyRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

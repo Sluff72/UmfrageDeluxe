@@ -38,7 +38,7 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
 
   // Try anonymous participant token
   const participantToken = req.headers['x-participant-token'] as string | undefined;
-  const surveyId = req.params.id || (req.headers['x-survey-id'] as string | undefined);
+  const surveyId = (req.params.id as string | undefined) || (req.headers['x-survey-id'] as string | undefined);
 
   if (participantToken && surveyId) {
     const database = getDatabase();
