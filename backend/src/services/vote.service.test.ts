@@ -421,6 +421,65 @@ describe('VoteService', () => {
       expect(votes).toHaveLength(2);
     });
 
+    it('should allow high value per option if within w_max budget (widerstand_punkte)', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId, 'widerstand_punkte', {
+        wMax: 15,
+        maxPointsPerOption: 10,
+      });
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      const optionA = addTestOption(survey.id, participantId, 'Option A');
+      const optionB = addTestOption(survey.id, participantId, 'Option B');
+      const optionC = addTestOption(survey.id, participantId, 'Option C');
+
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      // Value of 10 on one option is allowed because total 10+2+3=15 <= w_max 15
+      const votes = service.submitVotes(
+        survey.id,
+        [
+          { optionId: optionA.id, value: 10 },
+          { optionId: optionB.id, value: 2 },
+          { optionId: optionC.id, value: 3 },
+        ],
+        participantId
+      );
+
+      expect(votes).toHaveLength(3);
+      expect(votes[0].value).toBe(10);
+    });
+
+    it('should reject high values that exceed w_max budget (widerstand_punkte)', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId, 'widerstand_punkte', {
+        wMax: 15,
+        maxPointsPerOption: 10,
+      });
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      const optionA = addTestOption(survey.id, participantId, 'Option A');
+      const optionB = addTestOption(survey.id, participantId, 'Option B');
+      const optionC = addTestOption(survey.id, participantId, 'Option C');
+
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      // Total 10+10+0 = 20 exceeds w_max of 15
+      expect(() =>
+        service.submitVotes(
+          survey.id,
+          [
+            { optionId: optionA.id, value: 10 },
+            { optionId: optionB.id, value: 10 },
+            { optionId: optionC.id, value: 0 },
+          ],
+          participantId
+        )
+      ).toThrow(ValidationError);
+    });
+
     it('should reject when option does not belong to survey', async () => {
       const userId = await createTestUser();
       const survey1 = createTestSurvey(userId, 'widerstand');

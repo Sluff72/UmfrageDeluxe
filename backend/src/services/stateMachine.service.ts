@@ -175,7 +175,7 @@ export class StateMachineService {
       const calculatedWMax = optionCount.count * 5;
       database
         .prepare(
-          `UPDATE surveys SET w_max = ?, max_points_per_option = 5 WHERE id = ?`
+          `UPDATE surveys SET w_max = ?, max_points_per_option = 10 WHERE id = ?`
         )
         .run(calculatedWMax, surveyId);
     }

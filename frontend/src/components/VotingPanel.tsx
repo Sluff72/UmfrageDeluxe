@@ -96,13 +96,27 @@ export default function VotingPanel({
     return wMax - getTotalPoints();
   }
 
+  /** Dynamic max for a slider: allows up to 10 per option, capped by remaining budget */
+  function getMaxForOption(optionId: string): number {
+    if (votingMethod !== "widerstand_punkte" || wMax === null) {
+      return effectiveMaxPerOption;
+    }
+    const currentValue = votes[optionId] ?? 0;
+    // Sum all OTHER slider values (not this one)
+    const otherTotal = Object.entries(votes)
+      .filter(([id]) => id !== optionId)
+      .reduce((sum, [, v]) => sum + v, 0);
+    const budgetLeft = wMax - otherTotal;
+    return Math.min(effectiveMaxPerOption, Math.max(0, budgetLeft));
+  }
+
   async function handleSubmit() {
     setIsSubmitting(true);
     setError(null);
 
     const voteEntries: VoteEntry[] = options.map((option) => ({
       optionId: option.id,
-      value: votes[option.id] ?? 0,
+      value: Math.min(votes[option.id] ?? 0, getMaxForOption(option.id)),
     }));
 
     try {
@@ -170,11 +184,7 @@ export default function VotingPanel({
             {isResistance ? (
               <ResistanceSlider
                 value={votes[option.id] ?? 0}
-                max={
-                  votingMethod === "widerstand_punkte"
-                    ? effectiveMaxPerOption
-                    : 10
-                }
+                max={getMaxForOption(option.id)}
                 onChange={(v) => setVoteValue(option.id, v)}
               />
             ) : (
@@ -190,7 +200,7 @@ export default function VotingPanel({
       {/* Submit button */}
       <button
         onClick={handleSubmit}
-        disabled={isSubmitting}
+        disabled={isSubmitting || getRemainingPoints() < 0}
         className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {isSubmitting
@@ -206,7 +216,7 @@ export default function VotingPanel({
 /* ── Resistance Slider ─────────────────────────────────────────── */
 
 function ResistanceSlider({
-  value,
+  value: rawValue,
   max,
   onChange,
 }: {
@@ -214,6 +224,9 @@ function ResistanceSlider({
   max: number;
   onChange: (v: number) => void;
 }) {
+  // Clamp displayed value to current max (budget may have shrunk)
+  const value = Math.min(rawValue, max);
+
   // Green (0) → Yellow (5) → Red (10)
   const percentage = max > 0 ? (value / 10) * 100 : 0;
 
@@ -248,9 +261,9 @@ function ResistanceSlider({
         <input
           type="range"
           min={0}
-          max={max}
+          max={10}
           value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onChange={(e) => onChange(Math.min(Number(e.target.value), max))}
           className="absolute inset-0 h-2 w-full cursor-pointer appearance-none bg-transparent
             [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full
             [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white [&::-moz-range-thumb]:bg-zinc-600
@@ -262,18 +275,24 @@ function ResistanceSlider({
 
       {/* Step markers */}
       <div className="flex justify-between px-0.5">
-        {Array.from({ length: Math.min(max, 10) + 1 }, (_, i) => (
-          <button
-            key={i}
-            onClick={() => onChange(i)}
-            className={`h-1.5 w-1.5 rounded-full transition ${
-              i <= value
-                ? "bg-zinc-400 dark:bg-zinc-500"
-                : "bg-zinc-200 dark:bg-zinc-700"
-            }`}
-            title={`${i}`}
-          />
-        ))}
+        {Array.from({ length: 11 }, (_, i) => {
+          const withinBudget = i <= max;
+          return (
+            <button
+              key={i}
+              onClick={() => withinBudget && onChange(i)}
+              className={`h-1.5 w-1.5 rounded-full transition ${
+                !withinBudget
+                  ? "cursor-not-allowed bg-zinc-100 dark:bg-zinc-800"
+                  : i <= value
+                    ? "bg-zinc-400 dark:bg-zinc-500"
+                    : "bg-zinc-200 dark:bg-zinc-700"
+              }`}
+              title={withinBudget ? `${i}` : `${i} (Budget)`}
+              disabled={!withinBudget}
+            />
+          );
+        })}
       </div>
     </div>
   );
