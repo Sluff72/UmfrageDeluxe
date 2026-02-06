@@ -50,6 +50,16 @@ export interface CreateSurveyInput {
   allowAnonymous?: boolean;
 }
 
+export interface SurveyOption {
+  id: string;
+  survey_id: string;
+  title: string;
+  description: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TransitionOption {
   targetStatus: SurveyStatus;
   allowed: boolean;

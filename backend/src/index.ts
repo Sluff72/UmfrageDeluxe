@@ -11,6 +11,7 @@ import { setupSocketServer } from './socket/index';
 import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
 import { surveyRouter } from './routes/survey.routes';
+import { optionRouter } from './routes/option.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 
@@ -33,6 +34,7 @@ console.log('Database initialized and migrations applied.');
 app.use('/api', healthRouter);
 app.use('/api', authRouter);
 app.use('/api', surveyRouter);
+app.use('/api', optionRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

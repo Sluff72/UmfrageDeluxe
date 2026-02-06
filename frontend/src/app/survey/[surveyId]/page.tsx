@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import PhaseController from "@/components/PhaseController";
+import OptionsList from "@/components/OptionsList";
 import type { Survey, SurveyParticipant, TransitionInfo } from "@/types/survey";
 import {
   SURVEY_STATUS_LABELS,
@@ -145,49 +146,52 @@ export default function SurveyDetailPage() {
             )}
 
             {/* Phase-dependent content area */}
-            <div className="rounded-xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-900">
-              {survey.status === "entwurf" && (
-                <div className="text-center">
-                  <p className="text-zinc-500 dark:text-zinc-400">
-                    Die Umfrage befindet sich im Entwurf. Konfiguriere die
-                    Einstellungen und starte die Optionensammlung.
-                  </p>
-                </div>
-              )}
-              {survey.status === "optionen_sammeln" && (
-                <div className="text-center">
-                  <p className="text-zinc-500 dark:text-zinc-400">
-                    Teilnehmer können jetzt Optionen einreichen.
-                  </p>
-                </div>
-              )}
-              {survey.status === "abstimmen" && (
-                <div className="text-center">
-                  <p className="text-zinc-500 dark:text-zinc-400">
-                    Die Abstimmung läuft.
-                    {transitionInfo && transitionInfo.votingRound > 1 && (
-                      <span className="block mt-1 text-xs">
-                        Runde {transitionInfo.votingRound}
-                      </span>
-                    )}
-                  </p>
-                </div>
-              )}
-              {survey.status === "einwand_integration" && (
-                <div className="text-center">
-                  <p className="text-zinc-500 dark:text-zinc-400">
-                    Einwände können eingereicht und integriert werden.
-                  </p>
-                </div>
-              )}
-              {survey.status === "beendet" && (
-                <div className="text-center">
-                  <p className="text-zinc-500 dark:text-zinc-400">
-                    Die Umfrage ist beendet. Die Ergebnisse stehen fest.
-                  </p>
-                </div>
-              )}
-            </div>
+            {survey.status === "entwurf" && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <p className="text-zinc-500 dark:text-zinc-400">
+                  Die Umfrage befindet sich im Entwurf. Konfiguriere die
+                  Einstellungen und starte die Optionensammlung.
+                </p>
+              </div>
+            )}
+
+            {/* Options list – visible from optionen_sammeln onward */}
+            {survey.status !== "entwurf" && (
+              <OptionsList
+                surveyId={surveyId}
+                surveyStatus={survey.status}
+                currentParticipantId={currentUserParticipant?.id ?? null}
+                canManage={canManage}
+              />
+            )}
+
+            {/* Phase info for voting/objection/completed */}
+            {survey.status === "abstimmen" && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <p className="text-zinc-500 dark:text-zinc-400">
+                  Die Abstimmung läuft.
+                  {transitionInfo && transitionInfo.votingRound > 1 && (
+                    <span className="block mt-1 text-xs">
+                      Runde {transitionInfo.votingRound}
+                    </span>
+                  )}
+                </p>
+              </div>
+            )}
+            {survey.status === "einwand_integration" && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <p className="text-zinc-500 dark:text-zinc-400">
+                  Einwände können eingereicht und integriert werden.
+                </p>
+              </div>
+            )}
+            {survey.status === "beendet" && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
+                <p className="text-zinc-500 dark:text-zinc-400">
+                  Die Umfrage ist beendet. Die Ergebnisse stehen fest.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
