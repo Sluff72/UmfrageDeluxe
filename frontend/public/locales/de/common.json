@@ -1,0 +1,47 @@
+{
+  "app": {
+    "title": "UmfrageDeluxe",
+    "description": "Konsensorientiertes Online-Umfragetool"
+  },
+  "nav": {
+    "dashboard": "Übersicht",
+    "login": "Anmelden",
+    "register": "Registrieren",
+    "logout": "Abmelden"
+  },
+  "survey": {
+    "status": {
+      "entwurf": "Entwurf",
+      "optionen_sammeln": "Optionen Sammeln",
+      "abstimmen": "Abstimmen",
+      "einwand_integration": "Einwand Integration",
+      "beendet": "Beendet"
+    },
+    "voting_method": {
+      "widerstand_punkte": "Widerstandsabfrage mit Punkteregel",
+      "widerstand": "Widerstandsabfrage",
+      "mehrheit": "Mehrheitsentscheid"
+    },
+    "roles": {
+      "host": "Host",
+      "co_host": "Co-Host",
+      "teilnehmer": "Teilnehmer"
+    }
+  },
+  "actions": {
+    "create": "Erstellen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "submit": "Absenden",
+    "join": "Beitreten",
+    "share": "Teilen",
+    "archive": "Archivieren"
+  },
+  "connection": {
+    "connecting": "Verbinde...",
+    "connected": "Verbunden",
+    "failed": "Verbindung fehlgeschlagen"
+  }
+}
