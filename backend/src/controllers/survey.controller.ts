@@ -4,7 +4,11 @@ import { surveyService } from '../services/survey.service';
 import { stateMachineService } from '../services/stateMachine.service';
 import { getSocketServer } from '../socket/index';
 import { SOCKET_EVENTS, buildSurveyRoomName } from '../socket/events';
-import type { CreateSurveySchemaInput, UpdateSurveySchemaInput } from '../validators/survey.schema';
+import type {
+  CreateSurveySchemaInput,
+  UpdateSurveySchemaInput,
+  UpdateParticipantRoleSchemaInput,
+} from '../validators/survey.schema';
 
 export class SurveyController {
   async createSurvey(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -131,6 +135,33 @@ export class SurveyController {
         previousStatus: result.previousStatus,
         warning: result.warning,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateParticipantRole(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const surveyId = req.params.id as string;
+      const participantId = req.params.participantId as string;
+      const { role }: UpdateParticipantRoleSchemaInput = req.body;
+      const userId = req.user!.sub;
+
+      const participant = surveyService.updateParticipantRole(surveyId, participantId, role, userId);
+
+      // Broadcast role change via Socket.IO so all participants see the update live
+      try {
+        const io = getSocketServer();
+        io.to(buildSurveyRoomName(surveyId)).emit(SOCKET_EVENTS.PARTICIPANT_ROLE_CHANGED, {
+          surveyId,
+          participantId,
+          newRole: role,
+        });
+      } catch {
+        // Socket.IO not initialized (e.g. in tests) – skip broadcast
+      }
+
+      res.json({ participant });
     } catch (error) {
       next(error);
     }

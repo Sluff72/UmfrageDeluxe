@@ -53,5 +53,12 @@ export const updateSurveySchema = z.object({
   allowAnonymous: z.boolean().optional(),
 });
 
+export const updateParticipantRoleSchema = z.object({
+  role: z.enum(['co_host', 'teilnehmer'], {
+    errorMap: () => ({ message: 'Rolle muss "co_host" oder "teilnehmer" sein' }),
+  }),
+});
+
 export type CreateSurveySchemaInput = z.infer<typeof createSurveySchema>;
 export type UpdateSurveySchemaInput = z.infer<typeof updateSurveySchema>;
+export type UpdateParticipantRoleSchemaInput = z.infer<typeof updateParticipantRoleSchema>;

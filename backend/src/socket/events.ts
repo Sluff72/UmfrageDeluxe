@@ -18,6 +18,8 @@ export const SOCKET_EVENTS = {
 
   OBJECTION_ADDED: 'objection:added',
   OBJECTION_STATUS_CHANGED: 'objection:status-changed',
+
+  PARTICIPANT_ROLE_CHANGED: 'survey:participant-role-changed',
 } as const;
 
 export function buildSurveyRoomName(surveyId: string): string {

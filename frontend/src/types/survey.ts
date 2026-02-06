@@ -37,6 +37,7 @@ export interface SurveyParticipant {
   survey_id: string;
   user_id: string | null;
   anonymous_name: string | null;
+  display_name: string;
   role: SurveyRole;
   joined_at: string;
 }

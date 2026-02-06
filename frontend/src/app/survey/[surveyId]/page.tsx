@@ -1,14 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import { useParticipantToken } from "@/hooks/useParticipantToken";
+import { useSurveySocket } from "@/hooks/useSurveySocket";
 import { api } from "@/lib/api";
 import PhaseController from "@/components/PhaseController";
 import OptionsList from "@/components/OptionsList";
 import VotingPanel from "@/components/VotingPanel";
 import ResultsPanel from "@/components/ResultsPanel";
+import ParticipantsList from "@/components/ParticipantsList";
 import type { Survey, SurveyParticipant, TransitionInfo } from "@/types/survey";
 import {
   SURVEY_STATUS_LABELS,
@@ -30,6 +33,20 @@ export default function SurveyDetailPage() {
   const [copied, setCopied] = useState(false);
 
   const surveyId = params.surveyId as string;
+  const { getToken } = useParticipantToken(surveyId);
+
+  // Revision counters – bumped by socket events to trigger child re-fetches
+  const [optionsRevision, setOptionsRevision] = useState(0);
+  const [votesRevision, setVotesRevision] = useState(0);
+  const [objectionsRevision, setObjectionsRevision] = useState(0);
+
+  // Set the API client's survey context so anonymous tokens are sent with requests
+  useEffect(() => {
+    api.setSurveyContext(surveyId);
+    return () => {
+      api.setSurveyContext(null);
+    };
+  }, [surveyId]);
 
   const fetchSurvey = useCallback(async () => {
     try {
@@ -69,9 +86,59 @@ export default function SurveyDetailPage() {
     }
   }, [isAuthLoading, fetchSurvey]);
 
-  const currentUserParticipant = participants.find(
-    (p) => p.user_id === user?.id
-  );
+  // Socket.IO: real-time updates from other participants
+  useSurveySocket(surveyId, {
+    onPhaseChanged: () => {
+      // Phase changed by another user (e.g. host) – re-fetch everything
+      fetchSurvey();
+    },
+    onParticipantJoined: () => {
+      // New participant joined – re-fetch to update participant count
+      fetchSurvey();
+    },
+    onOptionAdded: () => {
+      setOptionsRevision((r) => r + 1);
+      refreshTransitionInfo();
+    },
+    onOptionUpdated: () => {
+      setOptionsRevision((r) => r + 1);
+    },
+    onOptionRemoved: () => {
+      setOptionsRevision((r) => r + 1);
+      refreshTransitionInfo();
+    },
+    onVoteReceived: () => {
+      setVotesRevision((r) => r + 1);
+      refreshTransitionInfo();
+    },
+    onObjectionAdded: () => {
+      setObjectionsRevision((r) => r + 1);
+      refreshTransitionInfo();
+    },
+    onObjectionStatusChanged: () => {
+      setObjectionsRevision((r) => r + 1);
+      refreshTransitionInfo();
+    },
+    onParticipantRoleChanged: () => {
+      // Role changed (promote/demote) – re-fetch to update participants list and permissions
+      fetchSurvey();
+    },
+  });
+
+  // Determine the current participant – either by user_id (registered) or by anonymous token
+  const currentUserParticipant = useMemo(() => {
+    // Registered user: match by user_id
+    if (user) {
+      return participants.find((p) => p.user_id === user.id) ?? null;
+    }
+    // Anonymous user: match by participant_id from stored token
+    const tokenEntry = getToken();
+    if (tokenEntry) {
+      return participants.find((p) => p.id === tokenEntry.participantId) ?? null;
+    }
+    return null;
+  }, [user, participants, getToken]);
+
   const isHost = currentUserParticipant?.role === "host";
   const isCoHost = currentUserParticipant?.role === "co_host";
   const canManage = isHost || isCoHost;
@@ -102,16 +169,18 @@ export default function SurveyDetailPage() {
     );
   }
 
+  const backHref = user ? "/dashboard" : "/";
+
   if (error || !survey) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
         <div className="text-center">
           <p className="text-red-500">{error || "Umfrage nicht gefunden"}</p>
           <Link
-            href="/dashboard"
+            href={backHref}
             className="mt-4 inline-block text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
           >
-            Zurück zum Dashboard
+            {user ? "Zurück zum Dashboard" : "Zur Startseite"}
           </Link>
         </div>
       </div>
@@ -123,10 +192,10 @@ export default function SurveyDetailPage() {
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-4">
           <Link
-            href="/dashboard"
+            href={backHref}
             className="text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
           >
-            &larr; Zurück
+            &larr; {user ? "Zurück" : "Startseite"}
           </Link>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
@@ -176,6 +245,7 @@ export default function SurveyDetailPage() {
                 currentParticipantId={currentUserParticipant?.id ?? null}
                 canManage={canManage}
                 onOptionsChange={refreshTransitionInfo}
+                revision={optionsRevision}
               />
             )}
 
@@ -207,6 +277,7 @@ export default function SurveyDetailPage() {
                 surveyStatus={survey.status}
                 canManage={canManage}
                 onObjectionChange={refreshTransitionInfo}
+                revision={votesRevision + objectionsRevision}
               />
             )}
           </div>
@@ -236,16 +307,17 @@ export default function SurveyDetailPage() {
                       </dd>
                     </div>
                   )}
-                <div>
-                  <dt className="text-zinc-400 dark:text-zinc-500">
-                    Teilnehmer
-                  </dt>
-                  <dd className="font-medium text-zinc-900 dark:text-zinc-100">
-                    {participants.length}
-                  </dd>
-                </div>
               </dl>
             </div>
+
+            {/* Participants list with role management */}
+            <ParticipantsList
+              surveyId={surveyId}
+              participants={participants}
+              currentParticipantId={currentUserParticipant?.id ?? null}
+              isHost={isHost}
+              onParticipantsChange={fetchSurvey}
+            />
 
             {/* Phase Controller */}
             {transitionInfo && (

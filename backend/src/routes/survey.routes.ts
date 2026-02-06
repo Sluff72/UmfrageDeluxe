@@ -3,7 +3,7 @@ import { surveyController } from '../controllers/survey.controller';
 import { validate } from '../middleware/validate';
 import { requireAuth } from '../middleware/auth';
 import { optionalAuth } from '../middleware/optionalAuth';
-import { createSurveySchema, updateSurveySchema } from '../validators/survey.schema';
+import { createSurveySchema, updateSurveySchema, updateParticipantRoleSchema } from '../validators/survey.schema';
 import { transitionSchema } from '../validators/transition.schema';
 
 const surveyRouter = Router();
@@ -53,6 +53,14 @@ surveyRouter.post(
   '/surveys/:id/archive',
   requireAuth,
   (req, res, next) => surveyController.archiveSurvey(req, res, next)
+);
+
+// Participant role management (host only)
+surveyRouter.put(
+  '/surveys/:id/participants/:participantId/role',
+  requireAuth,
+  validate(updateParticipantRoleSchema),
+  (req, res, next) => surveyController.updateParticipantRole(req, res, next)
 );
 
 // Phase transitions

@@ -1,13 +1,29 @@
 import { API_URL } from "./constants";
+import { getParticipantTokenForSurvey } from "@/hooks/useParticipantToken";
 
 class ApiClient {
   private baseUrl: string;
+
+  /**
+   * When set, the API client will include X-Participant-Token and X-Survey-Id
+   * headers for anonymous participant authentication.
+   */
+  private activeSurveyId: string | null = null;
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
 
-  private getToken(): string | null {
+  /**
+   * Set the active survey context. All subsequent requests will include
+   * anonymous participant headers if a token exists for this survey
+   * and no JWT is available.
+   */
+  setSurveyContext(surveyId: string | null): void {
+    this.activeSurveyId = surveyId;
+  }
+
+  private getJwtToken(): string | null {
     if (typeof window === "undefined") return null;
     return localStorage.getItem("token");
   }
@@ -18,9 +34,16 @@ class ApiClient {
       ...extraHeaders,
     };
 
-    const token = this.getToken();
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    const jwtToken = this.getJwtToken();
+    if (jwtToken) {
+      headers["Authorization"] = `Bearer ${jwtToken}`;
+    } else if (this.activeSurveyId) {
+      // No JWT – try anonymous participant token
+      const entry = getParticipantTokenForSurvey(this.activeSurveyId);
+      if (entry) {
+        headers["X-Participant-Token"] = entry.token;
+        headers["X-Survey-Id"] = entry.surveyId;
+      }
     }
 
     return headers;

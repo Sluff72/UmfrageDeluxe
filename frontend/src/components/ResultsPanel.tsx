@@ -39,6 +39,8 @@ interface ResultsPanelProps {
   surveyStatus: SurveyStatus;
   canManage: boolean;
   onObjectionChange?: () => void;
+  /** Bumped externally (e.g. by socket events) to trigger a re-fetch */
+  revision?: number;
 }
 
 const OBJECTION_STATUS_LABELS: Record<ObjectionStatus, string> = {
@@ -64,6 +66,7 @@ export default function ResultsPanel({
   surveyStatus,
   canManage,
   onObjectionChange,
+  revision = 0,
 }: ResultsPanelProps) {
   const [results, setResults] = useState<VoteResultWithObjections[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,7 +101,7 @@ export default function ResultsPanel({
 
   useEffect(() => {
     fetchResults();
-  }, [fetchResults]);
+  }, [fetchResults, revision]);
 
   function handleOptionClick(optionId: string) {
     if (!isObjectionPhase) return;

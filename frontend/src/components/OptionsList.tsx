@@ -10,6 +10,8 @@ interface OptionsListProps {
   currentParticipantId: string | null;
   canManage: boolean;
   onOptionsChange?: () => void;
+  /** Bumped externally (e.g. by socket events) to trigger a re-fetch */
+  revision?: number;
 }
 
 export default function OptionsList({
@@ -18,6 +20,7 @@ export default function OptionsList({
   currentParticipantId,
   canManage,
   onOptionsChange,
+  revision = 0,
 }: OptionsListProps) {
   const [options, setOptions] = useState<SurveyOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +50,7 @@ export default function OptionsList({
 
   useEffect(() => {
     fetchOptions();
-  }, [fetchOptions]);
+  }, [fetchOptions, revision]);
 
   async function handleAddOption(e: React.FormEvent) {
     e.preventDefault();

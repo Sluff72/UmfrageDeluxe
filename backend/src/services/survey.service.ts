@@ -148,12 +148,21 @@ export class SurveyService {
       .get(surveyId) as Survey;
   }
 
-  getParticipantsForSurvey(surveyId: string): SurveyParticipant[] {
+  getParticipantsForSurvey(surveyId: string): (SurveyParticipant & { display_name: string })[] {
     const database = getDatabase();
 
     return database
-      .prepare('SELECT * FROM survey_participants WHERE survey_id = ?')
-      .all(surveyId) as SurveyParticipant[];
+      .prepare(
+        `SELECT sp.*,
+                COALESCE(u.display_name, u.username, sp.anonymous_name, 'Anonym') as display_name
+         FROM survey_participants sp
+         LEFT JOIN users u ON u.id = sp.user_id
+         WHERE sp.survey_id = ?
+         ORDER BY
+           CASE sp.role WHEN 'host' THEN 0 WHEN 'co_host' THEN 1 ELSE 2 END,
+           sp.joined_at ASC`
+      )
+      .all(surveyId) as (SurveyParticipant & { display_name: string })[];
   }
 
   addCoHost(surveyId: string, targetUserId: string, actorUserId: string): SurveyParticipant {
@@ -224,6 +233,46 @@ export class SurveyService {
       ) as SurveyParticipant;
 
     return { survey, participant };
+  }
+
+  /**
+   * Update a participant's role. Only the host can do this.
+   * Cannot change the host's own role.
+   */
+  updateParticipantRole(
+    surveyId: string,
+    participantId: string,
+    newRole: 'co_host' | 'teilnehmer',
+    actorUserId: string
+  ): SurveyParticipant {
+    this.assertHost(surveyId, actorUserId);
+
+    const database = getDatabase();
+
+    const participant = database
+      .prepare('SELECT * FROM survey_participants WHERE id = ? AND survey_id = ?')
+      .get(participantId, surveyId) as SurveyParticipant | undefined;
+
+    if (!participant) {
+      throw new NotFoundError('Teilnehmer nicht gefunden');
+    }
+
+    if (participant.role === 'host') {
+      throw new ForbiddenError('Die Rolle des Hosts kann nicht geändert werden');
+    }
+
+    // Only registered users can become co-hosts (anonymous users lack JWT for requireAuth endpoints)
+    if (newRole === 'co_host' && !participant.user_id) {
+      throw new ValidationError('Nur registrierte Teilnehmer können zum Co-Host befördert werden');
+    }
+
+    if (participant.role === newRole) {
+      return participant;
+    }
+
+    return database
+      .prepare('UPDATE survey_participants SET role = ? WHERE id = ? RETURNING *')
+      .get(newRole, participantId) as SurveyParticipant;
   }
 
   private assertHost(surveyId: string, userId: string): void {
