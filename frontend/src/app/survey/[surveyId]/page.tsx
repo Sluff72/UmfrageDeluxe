@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import PhaseController from "@/components/PhaseController";
 import OptionsList from "@/components/OptionsList";
+import VotingPanel from "@/components/VotingPanel";
+import ResultsPanel from "@/components/ResultsPanel";
 import type { Survey, SurveyParticipant, TransitionInfo } from "@/types/survey";
 import {
   SURVEY_STATUS_LABELS,
@@ -47,6 +49,17 @@ export default function SurveyDetailPage() {
       setError("Umfrage konnte nicht geladen werden");
     } finally {
       setIsLoading(false);
+    }
+  }, [surveyId]);
+
+  const refreshTransitionInfo = useCallback(async () => {
+    try {
+      const data = await api
+        .get<TransitionInfo>(`/api/surveys/${surveyId}/transition-info`)
+        .catch(() => null);
+      setTransitionInfo(data);
+    } catch {
+      // ignore
     }
   }, [surveyId]);
 
@@ -162,33 +175,41 @@ export default function SurveyDetailPage() {
                 surveyStatus={survey.status}
                 currentParticipantId={currentUserParticipant?.id ?? null}
                 canManage={canManage}
+                onOptionsChange={refreshTransitionInfo}
               />
             )}
 
-            {/* Phase info for voting/objection/completed */}
+            {/* Voting panel – visible during abstimmen */}
             {survey.status === "abstimmen" && (
-              <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                <p className="text-zinc-500 dark:text-zinc-400">
-                  Die Abstimmung läuft.
-                  {transitionInfo && transitionInfo.votingRound > 1 && (
-                    <span className="block mt-1 text-xs">
-                      Runde {transitionInfo.votingRound}
-                    </span>
-                  )}
-                </p>
-              </div>
+              <>
+                {transitionInfo && transitionInfo.votingRound > 1 && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-center text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+                    Runde {transitionInfo.votingRound}
+                  </div>
+                )}
+                <VotingPanel
+                  surveyId={surveyId}
+                  votingMethod={survey.voting_method}
+                  wMax={survey.w_max}
+                  maxPointsPerOption={survey.max_points_per_option}
+                />
+              </>
             )}
+            {/* Results – visible from einwand_integration onward, and for host during abstimmen */}
+            {(survey.status === "einwand_integration" ||
+              survey.status === "beendet" ||
+              (survey.status === "abstimmen" && canManage)) && (
+              <ResultsPanel
+                key={survey.status}
+                surveyId={surveyId}
+                votingMethod={survey.voting_method}
+              />
+            )}
+
             {survey.status === "einwand_integration" && (
               <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
                 <p className="text-zinc-500 dark:text-zinc-400">
                   Einwände können eingereicht und integriert werden.
-                </p>
-              </div>
-            )}
-            {survey.status === "beendet" && (
-              <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                <p className="text-zinc-500 dark:text-zinc-400">
-                  Die Umfrage ist beendet. Die Ergebnisse stehen fest.
                 </p>
               </div>
             )}
@@ -208,26 +229,17 @@ export default function SurveyDetailPage() {
                     {VOTING_METHOD_LABELS[survey.voting_method]}
                   </dd>
                 </div>
-                {survey.voting_method === "widerstand_punkte" && (
-                  <>
+                {survey.voting_method === "widerstand_punkte" &&
+                  survey.w_max !== null && (
                     <div>
                       <dt className="text-zinc-400 dark:text-zinc-500">
-                        W-Max
+                        Punktebudget (W-Max)
                       </dt>
                       <dd className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {survey.w_max ?? "—"}
+                        {survey.w_max} (= {survey.w_max / 5} Optionen &times; 5)
                       </dd>
                     </div>
-                    <div>
-                      <dt className="text-zinc-400 dark:text-zinc-500">
-                        Max/Option
-                      </dt>
-                      <dd className="font-medium text-zinc-900 dark:text-zinc-100">
-                        {survey.max_points_per_option}
-                      </dd>
-                    </div>
-                  </>
-                )}
+                  )}
                 <div>
                   <dt className="text-zinc-400 dark:text-zinc-500">
                     Teilnehmer

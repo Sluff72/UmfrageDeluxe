@@ -166,6 +166,20 @@ export class StateMachineService {
         .run(surveyId);
     }
 
+    // Auto-calculate W-Max for widerstand_punkte when entering abstimmen
+    if (targetStatus === 'abstimmen' && survey.voting_method === 'widerstand_punkte') {
+      const optionCount = database
+        .prepare('SELECT COUNT(*) as count FROM options WHERE survey_id = ?')
+        .get(surveyId) as { count: number };
+
+      const calculatedWMax = optionCount.count * 5;
+      database
+        .prepare(
+          `UPDATE surveys SET w_max = ?, max_points_per_option = 5 WHERE id = ?`
+        )
+        .run(calculatedWMax, surveyId);
+    }
+
     // Perform the transition
     const updatedSurvey = database
       .prepare(

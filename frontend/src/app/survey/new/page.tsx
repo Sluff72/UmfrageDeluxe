@@ -14,8 +14,6 @@ export default function NewSurveyPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [votingMethod, setVotingMethod] = useState<VotingMethod>("widerstand");
-  const [wMax, setWMax] = useState<number>(20);
-  const [maxPointsPerOption, setMaxPointsPerOption] = useState<number>(5);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,11 +33,6 @@ export default function NewSurveyPage() {
         description: description || undefined,
         votingMethod,
       };
-
-      if (votingMethod === "widerstand_punkte") {
-        body.wMax = wMax;
-        body.maxPointsPerOption = maxPointsPerOption;
-      }
 
       const data = await api.post<{ survey: Survey }>("/api/surveys", body);
       router.push(`/survey/${data.survey.id}`);
@@ -149,46 +142,6 @@ export default function NewSurveyPage() {
                 ))}
               </div>
             </div>
-
-            {votingMethod === "widerstand_punkte" && (
-              <div className="grid grid-cols-2 gap-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/50">
-                <div>
-                  <label
-                    htmlFor="wMax"
-                    className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-                  >
-                    W-Max (Gesamt-Punktebudget)
-                  </label>
-                  <input
-                    id="wMax"
-                    type="number"
-                    value={wMax}
-                    onChange={(e) => setWMax(parseInt(e.target.value) || 0)}
-                    min={1}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-400 dark:focus:ring-zinc-400/20"
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="maxPoints"
-                    className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
-                  >
-                    Max. Punkte pro Option
-                  </label>
-                  <input
-                    id="maxPoints"
-                    type="number"
-                    value={maxPointsPerOption}
-                    onChange={(e) =>
-                      setMaxPointsPerOption(parseInt(e.target.value) || 1)
-                    }
-                    min={1}
-                    max={10}
-                    className="w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-400 dark:focus:ring-zinc-400/20"
-                  />
-                </div>
-              </div>
-            )}
 
             {error && (
               <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">

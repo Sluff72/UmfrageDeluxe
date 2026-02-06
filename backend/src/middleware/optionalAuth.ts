@@ -54,5 +54,6 @@ export function optionalAuth(req: Request, res: Response, next: NextFunction): v
     }
   }
 
-  res.status(401).json({ error: 'Authentication required' });
+  // Truly optional: if no auth method works, proceed without user/participant
+  next();
 }

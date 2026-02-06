@@ -12,6 +12,7 @@ import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
 import { surveyRouter } from './routes/survey.routes';
 import { optionRouter } from './routes/option.routes';
+import { voteRouter } from './routes/vote.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 
@@ -35,6 +36,7 @@ app.use('/api', healthRouter);
 app.use('/api', authRouter);
 app.use('/api', surveyRouter);
 app.use('/api', optionRouter);
+app.use('/api', voteRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

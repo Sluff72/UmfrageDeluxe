@@ -9,6 +9,7 @@ interface OptionsListProps {
   surveyStatus: SurveyStatus;
   currentParticipantId: string | null;
   canManage: boolean;
+  onOptionsChange?: () => void;
 }
 
 export default function OptionsList({
@@ -16,6 +17,7 @@ export default function OptionsList({
   surveyStatus,
   currentParticipantId,
   canManage,
+  onOptionsChange,
 }: OptionsListProps) {
   const [options, setOptions] = useState<SurveyOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,6 +67,7 @@ export default function OptionsList({
       setOptions((prev) => [...prev, data.option]);
       setNewTitle("");
       setNewDescription("");
+      onOptionsChange?.();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Option konnte nicht erstellt werden"
@@ -106,6 +109,7 @@ export default function OptionsList({
     try {
       await api.delete(`/api/options/${optionId}`);
       setOptions((prev) => prev.filter((o) => o.id !== optionId));
+      onOptionsChange?.();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Option konnte nicht gelöscht werden"
