@@ -1,6 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { surveyService } from '../services/survey.service';
+import { stateMachineService } from '../services/stateMachine.service';
+import { getSocketServer } from '../socket/index';
+import { SOCKET_EVENTS, buildSurveyRoomName } from '../socket/events';
 import type { CreateSurveySchemaInput, UpdateSurveySchemaInput } from '../validators/survey.schema';
 
 export class SurveyController {
@@ -99,6 +102,45 @@ export class SurveyController {
           anonymousToken: participant.anonymous_token,
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+  async transitionSurvey(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const surveyId = req.params.id as string;
+      const { targetStatus } = req.body;
+      const userId = req.user!.sub;
+
+      const result = stateMachineService.transitionSurvey(surveyId, targetStatus, userId);
+
+      // Broadcast phase change via Socket.IO
+      try {
+        const io = getSocketServer();
+        io.to(buildSurveyRoomName(surveyId)).emit(SOCKET_EVENTS.SURVEY_PHASE_CHANGED, {
+          surveyId,
+          previousStatus: result.previousStatus,
+          newStatus: result.survey.status,
+        });
+      } catch {
+        // Socket.IO not initialized (e.g. in tests) – skip broadcast
+      }
+
+      res.json({
+        survey: result.survey,
+        previousStatus: result.previousStatus,
+        warning: result.warning,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getTransitionInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const surveyId = req.params.id as string;
+      const info = stateMachineService.getTransitionInfo(surveyId);
+      res.json(info);
     } catch (error) {
       next(error);
     }

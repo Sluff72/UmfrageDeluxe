@@ -50,6 +50,19 @@ export interface CreateSurveyInput {
   allowAnonymous?: boolean;
 }
 
+export interface TransitionOption {
+  targetStatus: SurveyStatus;
+  allowed: boolean;
+  reason?: string;
+  warning?: string;
+}
+
+export interface TransitionInfo {
+  currentStatus: SurveyStatus;
+  availableTransitions: TransitionOption[];
+  votingRound: number;
+}
+
 export const SURVEY_STATUS_LABELS: Record<SurveyStatus, string> = {
   entwurf: "Entwurf",
   optionen_sammeln: "Optionen Sammeln",

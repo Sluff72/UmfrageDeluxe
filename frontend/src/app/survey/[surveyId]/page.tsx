@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
-import type { Survey, SurveyParticipant } from "@/types/survey";
+import PhaseController from "@/components/PhaseController";
+import type { Survey, SurveyParticipant, TransitionInfo } from "@/types/survey";
 import {
   SURVEY_STATUS_LABELS,
   SURVEY_STATUS_COLORS,
@@ -20,19 +21,27 @@ export default function SurveyDetailPage() {
   const [participants, setParticipants] = useState<SurveyParticipant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showShareDialog, setShowShareDialog] = useState(false);
+  const [transitionInfo, setTransitionInfo] = useState<TransitionInfo | null>(
+    null
+  );
   const [copied, setCopied] = useState(false);
 
   const surveyId = params.surveyId as string;
 
   const fetchSurvey = useCallback(async () => {
     try {
-      const data = await api.get<{
-        survey: Survey;
-        participants: SurveyParticipant[];
-      }>(`/api/surveys/${surveyId}`);
-      setSurvey(data.survey);
-      setParticipants(data.participants);
+      const [surveyData, transitionData] = await Promise.all([
+        api.get<{
+          survey: Survey;
+          participants: SurveyParticipant[];
+        }>(`/api/surveys/${surveyId}`),
+        api
+          .get<TransitionInfo>(`/api/surveys/${surveyId}/transition-info`)
+          .catch(() => null),
+      ]);
+      setSurvey(surveyData.survey);
+      setParticipants(surveyData.participants);
+      setTransitionInfo(transitionData);
     } catch {
       setError("Umfrage konnte nicht geladen werden");
     } finally {
@@ -135,13 +144,49 @@ export default function SurveyDetailPage() {
               </div>
             )}
 
-            {/* Phase-dependent content placeholder */}
-            <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
-              <p className="text-zinc-500 dark:text-zinc-400">
-                {survey.status === "entwurf"
-                  ? "Die Umfrage befindet sich im Entwurf. Konfiguriere die Einstellungen und starte die Optionensammlung."
-                  : `Phase: ${SURVEY_STATUS_LABELS[survey.status]}`}
-              </p>
+            {/* Phase-dependent content area */}
+            <div className="rounded-xl border border-zinc-200 bg-white p-8 dark:border-zinc-800 dark:bg-zinc-900">
+              {survey.status === "entwurf" && (
+                <div className="text-center">
+                  <p className="text-zinc-500 dark:text-zinc-400">
+                    Die Umfrage befindet sich im Entwurf. Konfiguriere die
+                    Einstellungen und starte die Optionensammlung.
+                  </p>
+                </div>
+              )}
+              {survey.status === "optionen_sammeln" && (
+                <div className="text-center">
+                  <p className="text-zinc-500 dark:text-zinc-400">
+                    Teilnehmer können jetzt Optionen einreichen.
+                  </p>
+                </div>
+              )}
+              {survey.status === "abstimmen" && (
+                <div className="text-center">
+                  <p className="text-zinc-500 dark:text-zinc-400">
+                    Die Abstimmung läuft.
+                    {transitionInfo && transitionInfo.votingRound > 1 && (
+                      <span className="block mt-1 text-xs">
+                        Runde {transitionInfo.votingRound}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              )}
+              {survey.status === "einwand_integration" && (
+                <div className="text-center">
+                  <p className="text-zinc-500 dark:text-zinc-400">
+                    Einwände können eingereicht und integriert werden.
+                  </p>
+                </div>
+              )}
+              {survey.status === "beendet" && (
+                <div className="text-center">
+                  <p className="text-zinc-500 dark:text-zinc-400">
+                    Die Umfrage ist beendet. Die Ergebnisse stehen fest.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -189,6 +234,16 @@ export default function SurveyDetailPage() {
                 </div>
               </dl>
             </div>
+
+            {/* Phase Controller */}
+            {transitionInfo && (
+              <PhaseController
+                surveyId={surveyId}
+                transitionInfo={transitionInfo}
+                canManage={canManage}
+                onTransitionComplete={fetchSurvey}
+              />
+            )}
 
             {/* Share */}
             {canManage && (

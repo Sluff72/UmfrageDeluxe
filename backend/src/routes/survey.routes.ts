@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { requireAuth } from '../middleware/auth';
 import { optionalAuth } from '../middleware/optionalAuth';
 import { createSurveySchema, updateSurveySchema } from '../validators/survey.schema';
+import { transitionSchema } from '../validators/transition.schema';
 
 const surveyRouter = Router();
 
@@ -52,6 +53,20 @@ surveyRouter.post(
   '/surveys/:id/archive',
   requireAuth,
   (req, res, next) => surveyController.archiveSurvey(req, res, next)
+);
+
+// Phase transitions
+surveyRouter.post(
+  '/surveys/:id/transition',
+  requireAuth,
+  validate(transitionSchema),
+  (req, res, next) => surveyController.transitionSurvey(req, res, next)
+);
+
+surveyRouter.get(
+  '/surveys/:id/transition-info',
+  optionalAuth,
+  (req, res, next) => surveyController.getTransitionInfo(req, res, next)
 );
 
 export { surveyRouter };
