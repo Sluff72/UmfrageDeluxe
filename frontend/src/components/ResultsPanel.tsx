@@ -11,6 +11,8 @@ import {
   Cell,
 } from "recharts";
 import { api } from "@/lib/api";
+import EmptyState from "@/components/EmptyState";
+import { ResultsPanelSkeleton } from "@/components/Skeleton";
 import type { VotingMethod, SurveyStatus, ObjectionStatus } from "@/types/survey";
 
 /* ── Types ─────────────────────────────────────────────────────── */
@@ -170,11 +172,7 @@ export default function ResultsPanel({
   }
 
   if (isLoading) {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <p className="text-sm text-zinc-500">Ergebnisse laden...</p>
-      </div>
-    );
+    return <ResultsPanelSkeleton />;
   }
 
   if (error && results.length === 0) {
@@ -187,13 +185,12 @@ export default function ResultsPanel({
 
   if (results.length === 0) {
     return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-          Ergebnisse
-        </h2>
-        <p className="text-sm text-zinc-400 dark:text-zinc-500">
-          Noch keine Stimmen abgegeben.
-        </p>
+      <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <EmptyState
+          icon="🗳️"
+          title="Noch keine Stimmen"
+          description="Sobald Teilnehmer abstimmen, erscheinen hier die Ergebnisse."
+        />
       </div>
     );
   }

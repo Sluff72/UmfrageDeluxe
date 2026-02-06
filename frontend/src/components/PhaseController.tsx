@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useToast } from "@/components/Toast";
 import type {
   SurveyStatus,
   TransitionInfo,
@@ -53,6 +54,7 @@ export default function PhaseController({
   const [confirmTarget, setConfirmTarget] = useState<SurveyStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const toast = useToast();
 
   const currentIndex = PHASE_ORDER.indexOf(transitionInfo.currentStatus);
 
@@ -72,6 +74,9 @@ export default function PhaseController({
         setWarning(result.warning);
       }
 
+      toast.success(
+        `Phase gewechselt: ${SURVEY_STATUS_LABELS[targetStatus]}`
+      );
       setConfirmTarget(null);
       onTransitionComplete();
     } catch (err) {

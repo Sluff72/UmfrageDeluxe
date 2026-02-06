@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useToast } from "@/components/Toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import EmptyState from "@/components/EmptyState";
+import { OptionsListSkeleton } from "@/components/Skeleton";
 import type { SurveyOption, SurveyStatus } from "@/types/survey";
 
 interface OptionsListProps {
@@ -31,6 +35,8 @@ export default function OptionsList({
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const toast = useToast();
 
   const canAddOptions = surveyStatus === "optionen_sammeln";
   const canEditOptions = surveyStatus === "optionen_sammeln";
@@ -106,12 +112,12 @@ export default function OptionsList({
   }
 
   async function handleDeleteOption(optionId: string) {
-    if (!confirm("Option wirklich löschen?")) return;
-
+    setDeleteTarget(null);
     setError(null);
     try {
       await api.delete(`/api/options/${optionId}`);
       setOptions((prev) => prev.filter((o) => o.id !== optionId));
+      toast.success("Option gelöscht");
       onOptionsChange?.();
     } catch (err) {
       setError(
@@ -132,11 +138,7 @@ export default function OptionsList({
   }
 
   if (isLoading) {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <p className="text-sm text-zinc-500">Optionen laden...</p>
-      </div>
-    );
+    return <OptionsListSkeleton />;
   }
 
   return (
@@ -151,9 +153,11 @@ export default function OptionsList({
 
       {/* Options list */}
       {options.length === 0 ? (
-        <p className="mb-4 text-sm text-zinc-400 dark:text-zinc-500">
-          Noch keine Optionen vorhanden.
-        </p>
+        <EmptyState
+          icon="💡"
+          title="Noch keine Optionen"
+          description={canAddOptions ? "Füge die erste Option hinzu." : undefined}
+        />
       ) : (
         <div className="mb-4 space-y-3">
           {options.map((option) => (
@@ -214,7 +218,7 @@ export default function OptionsList({
                         Bearbeiten
                       </button>
                       <button
-                        onClick={() => handleDeleteOption(option.id)}
+                        onClick={() => setDeleteTarget(option.id)}
                         className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400"
                       >
                         Löschen
@@ -227,6 +231,17 @@ export default function OptionsList({
           ))}
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Option löschen"
+        message="Möchtest du diese Option wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+        confirmLabel="Löschen"
+        variant="danger"
+        onConfirm={() => deleteTarget && handleDeleteOption(deleteTarget)}
+        onCancel={() => setDeleteTarget(null)}
+      />
 
       {/* Add option form */}
       {canAddOptions && (

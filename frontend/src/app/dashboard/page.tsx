@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
+import Header from "@/components/Header";
+import EmptyState from "@/components/EmptyState";
+import { SurveyCardSkeleton } from "@/components/Skeleton";
 import type { SurveyWithParticipantCount } from "@/types/survey";
 import {
   SURVEY_STATUS_LABELS,
@@ -60,12 +63,10 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-            UmfrageDeluxe
-          </h1>
-          <div className="flex items-center gap-4">
+      <Header
+        title="UmfrageDeluxe"
+        rightContent={
+          <>
             <span className="text-sm text-zinc-600 dark:text-zinc-400">
               {user.display_name || user.username}
             </span>
@@ -75,9 +76,9 @@ export default function DashboardPage() {
             >
               Abmelden
             </button>
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="mb-8 flex items-center justify-between">
@@ -93,14 +94,20 @@ export default function DashboardPage() {
         </div>
 
         {isLoadingSurveys ? (
-          <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-            <p className="text-zinc-500">Umfragen werden geladen...</p>
+          <div className="grid gap-4">
+            {[1, 2, 3].map((i) => (
+              <SurveyCardSkeleton key={i} />
+            ))}
           </div>
         ) : activeSurveys.length === 0 ? (
-          <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center dark:border-zinc-800 dark:bg-zinc-900">
-            <p className="text-zinc-500 dark:text-zinc-400">
-              Du hast noch keine Umfragen. Erstelle deine erste Umfrage!
-            </p>
+          <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+            <EmptyState
+              icon="📋"
+              title="Noch keine Umfragen"
+              description="Erstelle deine erste Umfrage und lade Teilnehmer ein."
+              actionLabel="Neue Umfrage erstellen"
+              actionHref="/survey/new"
+            />
           </div>
         ) : (
           <div className="grid gap-4">

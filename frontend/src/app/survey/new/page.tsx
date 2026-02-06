@@ -5,8 +5,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { api, ApiError } from "@/lib/api";
+import Header from "@/components/Header";
 import type { Survey, VotingMethod } from "@/types/survey";
 import { VOTING_METHOD_LABELS } from "@/types/survey";
+
+const VOTING_METHOD_DESCRIPTIONS: Record<VotingMethod, string> = {
+  widerstand_punkte:
+    "Teilnehmer verteilen Widerstandspunkte (0–10) mit begrenztem Budget.",
+  widerstand:
+    "Teilnehmer bewerten ihren Widerstand (0–10) pro Option ohne Limit.",
+  mehrheit: "Einfach Zustimmen oder Ablehnen pro Option.",
+};
 
 export default function NewSurveyPage() {
   const router = useRouter();
@@ -49,19 +58,7 @@ export default function NewSurveyPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-3xl items-center gap-4 px-6 py-4">
-          <Link
-            href="/dashboard"
-            className="text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            &larr; Zurück
-          </Link>
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-            Neue Umfrage
-          </h1>
-        </div>
-      </header>
+      <Header title="Neue Umfrage" backHref="/dashboard" />
 
       <main className="mx-auto max-w-3xl px-6 py-10">
         <form
@@ -121,7 +118,7 @@ export default function NewSurveyPage() {
                 ).map(([method, label]) => (
                   <label
                     key={method}
-                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition ${
+                    className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${
                       votingMethod === method
                         ? "border-zinc-900 bg-zinc-50 dark:border-zinc-300 dark:bg-zinc-800"
                         : "border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600"
@@ -133,11 +130,16 @@ export default function NewSurveyPage() {
                       value={method}
                       checked={votingMethod === method}
                       onChange={() => setVotingMethod(method)}
-                      className="accent-zinc-900 dark:accent-zinc-300"
+                      className="mt-0.5 accent-zinc-900 dark:accent-zinc-300"
                     />
-                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                      {label}
-                    </span>
+                    <div>
+                      <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {label}
+                      </span>
+                      <p className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">
+                        {VOTING_METHOD_DESCRIPTIONS[method]}
+                      </p>
+                    </div>
                   </label>
                 ))}
               </div>

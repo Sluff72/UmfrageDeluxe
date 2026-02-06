@@ -7,11 +7,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { useParticipantToken } from "@/hooks/useParticipantToken";
 import { useSurveySocket } from "@/hooks/useSurveySocket";
 import { api } from "@/lib/api";
+import Header from "@/components/Header";
+import { useToast } from "@/components/Toast";
 import PhaseController from "@/components/PhaseController";
 import OptionsList from "@/components/OptionsList";
 import VotingPanel from "@/components/VotingPanel";
 import ResultsPanel from "@/components/ResultsPanel";
 import ParticipantsList from "@/components/ParticipantsList";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Survey, SurveyParticipant, TransitionInfo } from "@/types/survey";
 import {
   SURVEY_STATUS_LABELS,
@@ -31,6 +34,8 @@ export default function SurveyDetailPage() {
     null
   );
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const surveyId = params.surveyId as string;
   const { getToken } = useParticipantToken(surveyId);
@@ -144,7 +149,7 @@ export default function SurveyDetailPage() {
   const canManage = isHost || isCoHost;
 
   async function handleDelete() {
-    if (!confirm("Möchtest du diese Umfrage wirklich löschen?")) return;
+    setShowDeleteConfirm(false);
     try {
       await api.delete(`/api/surveys/${surveyId}`);
       router.push("/dashboard");
@@ -159,6 +164,7 @@ export default function SurveyDetailPage() {
     navigator.clipboard.writeText(link);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    toast.success("Einladungslink kopiert!");
   }
 
   if (isLoading || isAuthLoading) {
@@ -189,19 +195,11 @@ export default function SurveyDetailPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <header className="border-b border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-4">
-          <Link
-            href={backHref}
-            className="text-sm text-zinc-500 transition hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-          >
-            &larr; {user ? "Zurück" : "Startseite"}
-          </Link>
-          <div className="flex-1">
-            <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">
-              {survey.title}
-            </h1>
-          </div>
+      <Header
+        title={survey.title}
+        backHref={backHref}
+        backLabel={user ? "Zurück" : "Startseite"}
+        rightContent={
           <span
             className={`rounded-full px-3 py-1 text-xs font-medium ${
               SURVEY_STATUS_COLORS[survey.status]
@@ -209,8 +207,8 @@ export default function SurveyDetailPage() {
           >
             {SURVEY_STATUS_LABELS[survey.status]}
           </span>
-        </div>
-      </header>
+        }
+      />
 
       <main className="mx-auto max-w-5xl px-6 py-10">
         <div className="grid gap-6 md:grid-cols-3">
@@ -363,10 +361,10 @@ export default function SurveyDetailPage() {
                 </h3>
                 <div className="space-y-2">
                   <button
-                    onClick={handleDelete}
+                    onClick={() => setShowDeleteConfirm(true)}
                     className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 transition hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"
                   >
-                    Umfrage löschen
+                    Umfrage l&ouml;schen
                   </button>
                 </div>
               </div>
@@ -374,6 +372,17 @@ export default function SurveyDetailPage() {
           </div>
         </div>
       </main>
+
+      {/* Delete survey confirmation */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Umfrage löschen"
+        message="Möchtest du diese Umfrage wirklich löschen? Alle Optionen, Abstimmungen und Einwände werden unwiderruflich entfernt."
+        confirmLabel="Endgültig löschen"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

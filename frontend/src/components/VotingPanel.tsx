@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useToast } from "@/components/Toast";
+import { VotingPanelSkeleton } from "@/components/Skeleton";
 import type { SurveyOption, VotingMethod } from "@/types/survey";
 
 interface VoteEntry {
@@ -36,7 +38,7 @@ export default function VotingPanel({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const toast = useToast();
 
   const effectiveMaxPerOption = maxPointsPerOption ?? 10;
   const isResistance =
@@ -83,7 +85,6 @@ export default function VotingPanel({
   function setVoteValue(optionId: string, value: number) {
     setVotes((prev) => ({ ...prev, [optionId]: value }));
     setError(null);
-    setSuccess(false);
   }
 
   function getTotalPoints(): number {
@@ -98,7 +99,6 @@ export default function VotingPanel({
   async function handleSubmit() {
     setIsSubmitting(true);
     setError(null);
-    setSuccess(false);
 
     const voteEntries: VoteEntry[] = options.map((option) => ({
       optionId: option.id,
@@ -108,8 +108,7 @@ export default function VotingPanel({
     try {
       await api.post(`/api/surveys/${surveyId}/votes`, { votes: voteEntries });
       setHasVoted(true);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      toast.success("Abstimmung erfolgreich gespeichert!");
       onVoteSubmit?.();
     } catch (err) {
       setError(
@@ -121,11 +120,7 @@ export default function VotingPanel({
   }
 
   if (isLoading) {
-    return (
-      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-        <p className="text-sm text-zinc-500">Abstimmung laden...</p>
-      </div>
-    );
+    return <VotingPanelSkeleton />;
   }
 
   return (
@@ -152,12 +147,6 @@ export default function VotingPanel({
 
       {error && (
         <p className="mb-4 text-sm text-red-500 dark:text-red-400">{error}</p>
-      )}
-
-      {success && (
-        <p className="mb-4 text-sm text-emerald-600 dark:text-emerald-400">
-          Abstimmung erfolgreich gespeichert!
-        </p>
       )}
 
       {/* Voting inputs per option */}

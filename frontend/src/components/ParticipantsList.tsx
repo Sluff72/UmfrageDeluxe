@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/api";
+import { useToast } from "@/components/Toast";
 import type { SurveyParticipant, SurveyRole } from "@/types/survey";
 
 interface ParticipantsListProps {
@@ -35,6 +36,7 @@ export default function ParticipantsList({
 }: ParticipantsListProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   async function handleRoleChange(
     participantId: string,
@@ -47,6 +49,11 @@ export default function ParticipantsList({
       await api.put(
         `/api/surveys/${surveyId}/participants/${participantId}/role`,
         { role: newRole }
+      );
+      toast.success(
+        newRole === "co_host"
+          ? "Zum Co-Host befördert"
+          : "Zum Teilnehmer zurückgestuft"
       );
       onParticipantsChange();
     } catch (err) {
