@@ -20,6 +20,7 @@ interface VotingPanelProps {
   votingMethod: VotingMethod;
   wMax: number | null;
   maxPointsPerOption: number | null;
+  onVoteSubmit?: () => void;
 }
 
 export default function VotingPanel({
@@ -27,6 +28,7 @@ export default function VotingPanel({
   votingMethod,
   wMax,
   maxPointsPerOption,
+  onVoteSubmit,
 }: VotingPanelProps) {
   const [options, setOptions] = useState<SurveyOption[]>([]);
   const [votes, setVotes] = useState<Record<string, number>>({});
@@ -108,6 +110,7 @@ export default function VotingPanel({
       setHasVoted(true);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
+      onVoteSubmit?.();
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Abstimmung konnte nicht gespeichert werden"

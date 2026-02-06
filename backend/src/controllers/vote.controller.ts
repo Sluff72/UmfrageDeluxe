@@ -61,7 +61,7 @@ export class VoteController {
   async getResults(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const surveyId = req.params.id as string;
-      const results = voteService.getResults(surveyId);
+      const results = voteService.getResultsWithObjections(surveyId);
 
       res.json({ results });
     } catch (error) {

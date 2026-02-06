@@ -2,7 +2,7 @@ import { getDatabase } from '../config/database';
 import { ForbiddenError, ValidationError } from '../utils/errors';
 import { surveyService } from './survey.service';
 import { stateMachineService } from './stateMachine.service';
-import type { Vote, VoteInput, VoteResult } from '../types/vote.types';
+import type { Vote, VoteInput, VoteResult, VoteResultWithObjections, ObjectionWithAuthor } from '../types/vote.types';
 import type { Survey } from '../types/survey.types';
 import type { SurveyParticipant } from '../types/user.types';
 
@@ -122,6 +122,53 @@ export class VoteService {
          ORDER BY average_value ASC`
       )
       .all(surveyId, currentRound) as VoteResult[];
+  }
+
+  /**
+   * Get results enriched with objections and author names per option.
+   */
+  getResultsWithObjections(surveyId: string): VoteResultWithObjections[] {
+    const results = this.getResults(surveyId);
+    const database = getDatabase();
+
+    // Get all objections for this survey with author names
+    const rawObjections = database
+      .prepare(
+        `SELECT
+           obj.id,
+           obj.option_id,
+           obj.text,
+           obj.status,
+           obj.host_response,
+           obj.created_at,
+           COALESCE(u.display_name, u.username, sp.anonymous_name, 'Anonym') as author_name
+         FROM objections obj
+         INNER JOIN survey_participants sp ON sp.id = obj.participant_id
+         LEFT JOIN users u ON u.id = sp.user_id
+         WHERE obj.survey_id = ?
+         ORDER BY obj.created_at ASC`
+      )
+      .all(surveyId) as (ObjectionWithAuthor & { option_id: string })[];
+
+    // Group objections by option_id
+    const objectionsByOption = new Map<string, ObjectionWithAuthor[]>();
+    for (const obj of rawObjections) {
+      const list = objectionsByOption.get(obj.option_id) ?? [];
+      list.push({
+        id: obj.id,
+        text: obj.text,
+        status: obj.status,
+        host_response: obj.host_response,
+        author_name: obj.author_name,
+        created_at: obj.created_at,
+      });
+      objectionsByOption.set(obj.option_id, list);
+    }
+
+    return results.map((r) => ({
+      ...r,
+      objections: objectionsByOption.get(r.option_id) ?? [],
+    }));
   }
 
   /**

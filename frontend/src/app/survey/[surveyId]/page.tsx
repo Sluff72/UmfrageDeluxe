@@ -192,6 +192,7 @@ export default function SurveyDetailPage() {
                   votingMethod={survey.voting_method}
                   wMax={survey.w_max}
                   maxPointsPerOption={survey.max_points_per_option}
+                  onVoteSubmit={refreshTransitionInfo}
                 />
               </>
             )}
@@ -203,15 +204,10 @@ export default function SurveyDetailPage() {
                 key={survey.status}
                 surveyId={surveyId}
                 votingMethod={survey.voting_method}
+                surveyStatus={survey.status}
+                canManage={canManage}
+                onObjectionChange={refreshTransitionInfo}
               />
-            )}
-
-            {survey.status === "einwand_integration" && (
-              <div className="rounded-xl border border-zinc-200 bg-white p-8 text-center dark:border-zinc-800 dark:bg-zinc-900">
-                <p className="text-zinc-500 dark:text-zinc-400">
-                  Einwände können eingereicht und integriert werden.
-                </p>
-              </div>
             )}
           </div>
 

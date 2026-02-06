@@ -24,3 +24,16 @@ export interface VoteResult {
   vote_count: number;
   average_value: number;
 }
+
+export interface ObjectionWithAuthor {
+  id: string;
+  text: string;
+  status: string;
+  host_response: string | null;
+  author_name: string;
+  created_at: string;
+}
+
+export interface VoteResultWithObjections extends VoteResult {
+  objections: ObjectionWithAuthor[];
+}

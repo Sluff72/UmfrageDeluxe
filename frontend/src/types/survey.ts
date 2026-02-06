@@ -73,6 +73,20 @@ export interface TransitionInfo {
   votingRound: number;
 }
 
+export type ObjectionStatus = "pending" | "integrated" | "dismissed";
+
+export interface Objection {
+  id: string;
+  survey_id: string;
+  participant_id: string;
+  option_id: string;
+  text: string;
+  status: ObjectionStatus;
+  host_response: string | null;
+  voting_round: number;
+  created_at: string;
+}
+
 export const SURVEY_STATUS_LABELS: Record<SurveyStatus, string> = {
   entwurf: "Entwurf",
   optionen_sammeln: "Optionen Sammeln",
