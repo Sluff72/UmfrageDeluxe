@@ -213,12 +213,14 @@ export default function OptionsList({
                     <div className="flex shrink-0 gap-1">
                       <button
                         onClick={() => startEditing(option)}
+                        aria-label={`Option "${option.title}" bearbeiten`}
                         className="rounded px-2 py-1 text-xs text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
                       >
                         Bearbeiten
                       </button>
                       <button
                         onClick={() => setDeleteTarget(option.id)}
+                        aria-label={`Option "${option.title}" löschen`}
                         className="rounded px-2 py-1 text-xs text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30 dark:hover:text-red-400"
                       >
                         Löschen

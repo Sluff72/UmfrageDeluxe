@@ -263,6 +263,10 @@ function ResistanceSlider({
           min={0}
           max={10}
           value={value}
+          aria-label={`Widerstand: ${value} von 10`}
+          aria-valuemin={0}
+          aria-valuemax={10}
+          aria-valuenow={value}
           onChange={(e) => onChange(Math.min(Number(e.target.value), max))}
           className="absolute inset-0 h-2 w-full cursor-pointer appearance-none bg-transparent
             [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:rounded-full
@@ -311,6 +315,7 @@ function MehrheitButtons({
     <div className="flex gap-2">
       <button
         onClick={() => onChange(1)}
+        aria-pressed={value === 1}
         className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition ${
           value === 1
             ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:border-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400"
@@ -321,6 +326,7 @@ function MehrheitButtons({
       </button>
       <button
         onClick={() => onChange(0)}
+        aria-pressed={value === 0}
         className={`flex-1 rounded-lg border px-4 py-2 text-sm font-medium transition ${
           value === 0
             ? "border-red-500 bg-red-50 text-red-700 dark:border-red-600 dark:bg-red-900/30 dark:text-red-400"
