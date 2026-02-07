@@ -35,6 +35,7 @@ voteRouter.get(
 voteRouter.get(
   '/surveys/:id/results',
   optionalAuth,
+  requireRole('host', 'co_host', 'teilnehmer'),
   (req, res, next) => voteController.getResults(req, res, next)
 );
 

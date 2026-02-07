@@ -63,7 +63,7 @@ export default function JoinPage() {
         if (err.statusCode === 404) {
           setError("Einladungslink ist ungültig oder die Umfrage existiert nicht.");
         } else if (err.statusCode === 403) {
-          setError("Diese Umfrage ist archiviert und nimmt keine neuen Teilnehmer an.");
+          setError(err.message);
         } else {
           setError(err.message);
         }

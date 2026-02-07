@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { API_URL } from "@/lib/constants";
+import { getParticipantTokenForSurvey } from "@/hooks/useParticipantToken";
 import { SOCKET_EVENTS } from "@/types/socket";
 import type {
   PhaseChangedPayload,
@@ -51,10 +52,17 @@ export function useSurveySocket(
   useEffect(() => {
     if (!surveyId) return;
 
+    const participantEntry = getParticipantTokenForSurvey(surveyId);
+
     // Connect to the Socket.IO server (same origin as the API)
     const socket = io(API_URL, {
       transports: ["websocket", "polling"],
       autoConnect: true,
+      withCredentials: true,
+      auth: {
+        surveyId,
+        participantToken: participantEntry?.token,
+      },
     });
 
     socketRef.current = socket;

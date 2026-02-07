@@ -7,7 +7,7 @@ import {
   useMemo,
   useState,
 } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api } from "@/lib/api";
 import type {
   UserPublic,
   AuthResponse,
@@ -30,46 +30,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserPublic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on mount
+  // Check for existing cookie-based session on mount
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
     api
       .get<{ user: UserPublic }>("/api/auth/me")
       .then(({ user }) => setUser(user))
       .catch(() => {
-        localStorage.removeItem("token");
+        setUser(null);
       })
       .finally(() => setIsLoading(false));
   }, []);
 
   const login = useCallback(async (input: LoginInput) => {
     const response = await api.post<AuthResponse>("/api/auth/login", input);
-    localStorage.setItem("token", response.token);
     setUser(response.user);
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {
-    const { user } = await api.post<{ user: UserPublic }>(
+    await api.post<{ user: UserPublic }>(
       "/api/auth/register",
       input
     );
 
-    // Auto-login after registration
+    // Auto-login after registration to establish the auth cookie
     const loginResponse = await api.post<AuthResponse>("/api/auth/login", {
       username: input.username,
       password: input.password,
     });
-    localStorage.setItem("token", loginResponse.token);
     setUser(loginResponse.user);
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem("token");
     setUser(null);
     api.post("/api/auth/logout").catch(() => {
       // Cookie cleanup is best-effort

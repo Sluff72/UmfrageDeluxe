@@ -205,6 +205,10 @@ export class SurveyService {
       throw new ForbiddenError('This survey is archived');
     }
 
+    if (!userId && !survey.allow_anonymous) {
+      throw new ForbiddenError('Anonymous participation is disabled for this survey');
+    }
+
     const database = getDatabase();
 
     // Check if registered user is already a participant

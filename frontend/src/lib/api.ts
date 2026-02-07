@@ -23,22 +23,14 @@ class ApiClient {
     this.activeSurveyId = surveyId;
   }
 
-  private getJwtToken(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("token");
-  }
-
   private buildHeaders(extraHeaders?: Record<string, string>): HeadersInit {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...extraHeaders,
     };
 
-    const jwtToken = this.getJwtToken();
-    if (jwtToken) {
-      headers["Authorization"] = `Bearer ${jwtToken}`;
-    } else if (this.activeSurveyId) {
-      // No JWT – try anonymous participant token
+    if (this.activeSurveyId) {
+      // Use anonymous participant token for survey-scoped guest access.
       const entry = getParticipantTokenForSurvey(this.activeSurveyId);
       if (entry) {
         headers["X-Participant-Token"] = entry.token;
@@ -57,6 +49,7 @@ class ApiClient {
 
     const response = await fetch(url, {
       ...options,
+      credentials: "include",
       headers: this.buildHeaders(options.headers as Record<string, string>),
     });
 

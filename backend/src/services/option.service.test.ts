@@ -632,6 +632,27 @@ describe('OptionService', () => {
       expect(resolved).toBe(result.participant.id);
     });
 
+    it('should reject participant context from a different survey', async () => {
+      const hostId = await createTestUser('host');
+      const surveyA = createTestSurvey(hostId);
+      const surveyB = createTestSurvey(hostId);
+
+      const result = surveyService.joinSurveyByInviteCode(
+        surveyA.invite_code,
+        null,
+        'Anonymous Fox',
+        'anon-token-abc'
+      );
+
+      expect(() =>
+        service.resolveParticipantId(
+          surveyB.id,
+          null,
+          result.participant
+        )
+      ).toThrow(ForbiddenError);
+    });
+
     it('should resolve participant id from userId when no participant is passed', async () => {
       const userId = await createTestUser();
       const survey = createTestSurvey(userId);

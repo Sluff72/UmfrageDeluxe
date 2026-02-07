@@ -524,6 +524,24 @@ describe('SurveyService', () => {
       expect(result.participant.role).toBe('teilnehmer');
     });
 
+    it('should reject anonymous join when allowAnonymous is disabled', async () => {
+      const hostId = await createTestUser('host');
+
+      const survey = service.createSurvey(
+        { title: 'Registered Only', votingMethod: 'widerstand', allowAnonymous: false },
+        hostId
+      );
+
+      expect(() =>
+        service.joinSurveyByInviteCode(
+          survey.invite_code,
+          null,
+          'Anonymous Fox',
+          'anon-token-123'
+        )
+      ).toThrow(ForbiddenError);
+    });
+
     it('should return the existing participant if a registered user has already joined', async () => {
       const hostId = await createTestUser('host');
       const joinerId = await createTestUser('joiner');

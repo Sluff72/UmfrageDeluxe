@@ -3,6 +3,7 @@ import { objectionController } from '../controllers/objection.controller';
 import { validate } from '../middleware/validate';
 import { requireAuth } from '../middleware/auth';
 import { optionalAuth } from '../middleware/optionalAuth';
+import { requireRole } from '../middleware/surveyRole';
 import { createObjectionSchema, reviewObjectionSchema } from '../validators/objection.schema';
 
 const objectionRouter = Router();
@@ -19,6 +20,7 @@ objectionRouter.post(
 objectionRouter.get(
   '/surveys/:id/objections',
   optionalAuth,
+  requireRole('host', 'co_host', 'teilnehmer'),
   (req, res, next) => objectionController.listObjections(req, res, next)
 );
 
