@@ -15,6 +15,19 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  function resolveRedirectTarget(rawRedirect: string | null): string {
+    if (!rawRedirect) {
+      return "/dashboard";
+    }
+
+    // Only allow internal absolute paths and block protocol-relative redirects (//...).
+    if (!rawRedirect.startsWith("/") || rawRedirect.startsWith("//")) {
+      return "/dashboard";
+    }
+
+    return rawRedirect;
+  }
+
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -22,7 +35,7 @@ function LoginForm() {
 
     try {
       await login({ username, password });
-      const redirectTo = searchParams.get("redirect") || "/dashboard";
+      const redirectTo = resolveRedirectTarget(searchParams.get("redirect"));
       router.push(redirectTo);
     } catch (err) {
       if (err instanceof ApiError) {

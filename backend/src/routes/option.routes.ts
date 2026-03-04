@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { optionController } from '../controllers/option.controller';
 import { validate } from '../middleware/validate';
 import { optionalAuth } from '../middleware/optionalAuth';
+import { requireRole } from '../middleware/surveyRole';
 import { createOptionSchema, updateOptionSchema } from '../validators/option.schema';
 
 const optionRouter = Router();
@@ -10,6 +11,7 @@ const optionRouter = Router();
 optionRouter.get(
   '/surveys/:id/options',
   optionalAuth,
+  requireRole('host', 'co_host', 'teilnehmer'),
   (req, res, next) => optionController.listOptions(req, res, next)
 );
 

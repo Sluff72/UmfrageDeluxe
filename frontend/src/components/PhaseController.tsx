@@ -114,7 +114,7 @@ export default function PhaseController({
       </h3>
 
       {/* Phase progress indicator */}
-      <div className="mb-6 flex items-center gap-1">
+      <div className="mb-6 flex items-center gap-1" role="group" aria-label="Umfrage-Fortschritt">
         {PHASE_ORDER.map((phase, index) => {
           const isActive = index === currentIndex;
           const isPast = index < currentIndex;

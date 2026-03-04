@@ -136,6 +136,9 @@ export class OptionService {
    */
   resolveParticipantId(surveyId: string, userId: string | null, participant: SurveyParticipant | undefined): string {
     if (participant) {
+      if (participant.survey_id !== surveyId) {
+        throw new ForbiddenError('Du bist kein Teilnehmer dieser Umfrage');
+      }
       return participant.id;
     }
 

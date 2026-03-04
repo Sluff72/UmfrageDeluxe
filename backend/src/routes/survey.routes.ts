@@ -3,6 +3,7 @@ import { surveyController } from '../controllers/survey.controller';
 import { validate } from '../middleware/validate';
 import { requireAuth } from '../middleware/auth';
 import { optionalAuth } from '../middleware/optionalAuth';
+import { requireRole } from '../middleware/surveyRole';
 import { createSurveySchema, updateSurveySchema, updateParticipantRoleSchema } from '../validators/survey.schema';
 import { transitionSchema } from '../validators/transition.schema';
 
@@ -33,6 +34,7 @@ surveyRouter.get(
 surveyRouter.get(
   '/surveys/:id',
   optionalAuth,
+  requireRole('host', 'co_host', 'teilnehmer'),
   (req, res, next) => surveyController.getSurvey(req, res, next)
 );
 
@@ -74,6 +76,7 @@ surveyRouter.post(
 surveyRouter.get(
   '/surveys/:id/transition-info',
   optionalAuth,
+  requireRole('host', 'co_host', 'teilnehmer'),
   (req, res, next) => surveyController.getTransitionInfo(req, res, next)
 );
 

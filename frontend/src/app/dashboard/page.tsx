@@ -67,7 +67,7 @@ export default function DashboardPage() {
         title="UmfrageDeluxe"
         rightContent={
           <>
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">
+            <span className="hidden text-sm text-zinc-600 sm:inline dark:text-zinc-400">
               {user.display_name || user.username}
             </span>
             <button
@@ -80,9 +80,9 @@ export default function DashboardPage() {
         }
       />
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <div className="mb-8 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
+      <main id="main-content" className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="mb-6 flex items-center justify-between sm:mb-8">
+          <h2 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-zinc-50">
             Meine Umfragen
           </h2>
           <Link
@@ -138,7 +138,7 @@ function SurveyCard({ survey }: { survey: SurveyWithParticipantCount }) {
   return (
     <Link
       href={`/survey/${survey.id}`}
-      className="block rounded-xl border border-zinc-200 bg-white p-6 transition hover:border-zinc-300 hover:shadow-sm dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
+      className="block rounded-xl border border-zinc-200 bg-white p-4 transition hover:border-zinc-300 hover:shadow-sm sm:p-6 dark:border-zinc-800 dark:bg-zinc-900 dark:hover:border-zinc-700"
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -159,11 +159,11 @@ function SurveyCard({ survey }: { survey: SurveyWithParticipantCount }) {
           {SURVEY_STATUS_LABELS[survey.status]}
         </span>
       </div>
-      <div className="mt-4 flex items-center gap-4 text-xs text-zinc-400 dark:text-zinc-500">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400 sm:mt-4 sm:gap-x-4 dark:text-zinc-500">
         <span>{VOTING_METHOD_LABELS[survey.voting_method]}</span>
-        <span>&middot;</span>
+        <span className="hidden sm:inline">&middot;</span>
         <span>{survey.participant_count} Teilnehmer</span>
-        <span>&middot;</span>
+        <span className="hidden sm:inline">&middot;</span>
         <span>Code: {survey.invite_code}</span>
       </div>
     </Link>

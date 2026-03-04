@@ -20,6 +20,11 @@ import { generalLimiter } from './middleware/rateLimiter';
 const app = express();
 const httpServer = createServer(app);
 
+// Trust first proxy (Caddy) so rate limiter sees real client IP
+if (env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // Middleware
 app.use(helmet());
 app.use(cors(corsOptions));

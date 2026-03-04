@@ -36,6 +36,7 @@ export default function SurveyDetailPage() {
   const [copied, setCopied] = useState(false);
   const toast = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
   const surveyId = params.surveyId as string;
   const { getToken } = useParticipantToken(surveyId);
@@ -158,6 +159,19 @@ export default function SurveyDetailPage() {
     }
   }
 
+  async function handleArchive() {
+    setShowArchiveConfirm(false);
+    try {
+      await api.post(`/api/surveys/${surveyId}/archive`);
+      toast.success("Umfrage archiviert");
+      fetchSurvey();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Archivierung fehlgeschlagen"
+      );
+    }
+  }
+
   function copyInviteLink() {
     if (!survey) return;
     const link = `${window.location.origin}/join/${survey.invite_code}`;
@@ -210,10 +224,10 @@ export default function SurveyDetailPage() {
         }
       />
 
-      <main className="mx-auto max-w-5xl px-6 py-10">
-        <div className="grid gap-6 md:grid-cols-3">
+      <main id="main-content" className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
+        <div className="grid gap-6 lg:grid-cols-3">
           {/* Main content area */}
-          <div className="md:col-span-2 space-y-6">
+          <div className="space-y-6 lg:col-span-2">
             {survey.description && (
               <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
@@ -360,6 +374,19 @@ export default function SurveyDetailPage() {
                   Aktionen
                 </h3>
                 <div className="space-y-2">
+                  {survey.status === "beendet" && !survey.is_archived && (
+                    <button
+                      onClick={() => setShowArchiveConfirm(true)}
+                      className="w-full rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      Umfrage archivieren
+                    </button>
+                  )}
+                  {survey.is_archived && (
+                    <div className="rounded-lg bg-zinc-100 px-4 py-2 text-center text-sm text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                      Archiviert
+                    </div>
+                  )}
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
                     className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 transition hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"
@@ -382,6 +409,16 @@ export default function SurveyDetailPage() {
         variant="danger"
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
+      />
+
+      {/* Archive survey confirmation */}
+      <ConfirmDialog
+        open={showArchiveConfirm}
+        title="Umfrage archivieren"
+        message="Die Umfrage wird archiviert und im Dashboard unter 'Archiviert' angezeigt. Du kannst sie dort weiterhin einsehen."
+        confirmLabel="Archivieren"
+        onConfirm={handleArchive}
+        onCancel={() => setShowArchiveConfirm(false)}
       />
     </div>
   );
