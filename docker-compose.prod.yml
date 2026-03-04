@@ -1,29 +1,10 @@
 services:
-  caddy:
-    image: caddy:2-alpine
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    environment:
-      - SITE_ADDRESS=${SITE_ADDRESS:-localhost}
-    depends_on:
-      backend:
-        condition: service_healthy
-      frontend:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - app
-
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    ports:
+      - "3029:3029"
     environment:
       NODE_ENV: production
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
@@ -38,8 +19,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-    networks:
-      - app
 
   frontend:
     build:
@@ -48,9 +27,14 @@ services:
       args:
         - NEXT_PUBLIC_API_URL=
         - NEXT_PUBLIC_WS_URL=
+    ports:
+      - "3030:3030"
     environment:
       PORT: 3030
       HOSTNAME: 0.0.0.0
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3030"]
@@ -58,14 +42,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    networks:
-      - app
 
 volumes:
   sqlite-data:
-  caddy-data:
-  caddy-config:
-
-networks:
-  app:
-    driver: bridge
