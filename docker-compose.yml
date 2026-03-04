@@ -6,7 +6,7 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - DATABASE_PATH=/data/umfrage.db
       - CORS_ORIGIN=http://localhost:3000
@@ -24,11 +24,11 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:3001
+        - NEXT_PUBLIC_WS_URL=ws://localhost:3001
     ports:
       - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3001
-      - NEXT_PUBLIC_WS_URL=ws://localhost:3001
     depends_on:
       backend:
         condition: service_healthy

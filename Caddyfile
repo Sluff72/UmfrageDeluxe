@@ -1,0 +1,15 @@
+{$SITE_ADDRESS:localhost} {
+	# API and Socket.IO → Backend
+	handle /api/* {
+		reverse_proxy backend:3001
+	}
+
+	handle /socket.io/* {
+		reverse_proxy backend:3001
+	}
+
+	# Everything else → Frontend
+	handle {
+		reverse_proxy frontend:3000
+	}
+}
