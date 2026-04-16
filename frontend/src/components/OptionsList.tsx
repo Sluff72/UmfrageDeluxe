@@ -1,12 +1,68 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import EmptyState from "@/components/EmptyState";
 import { OptionsListSkeleton } from "@/components/Skeleton";
 import type { SurveyOption, SurveyStatus } from "@/types/survey";
+
+interface OptionExportEntry {
+  title: string;
+  description?: string;
+}
+
+interface OptionsExportFile {
+  options: OptionExportEntry[];
+}
+
+const MAX_IMPORT_OPTIONS = 100;
+
+/**
+ * Accept either the object form `{ options: [...] }` or a bare array `[...]`
+ * for robustness with hand-crafted JSON. Returns the canonical
+ * `OptionExportEntry[]` shape or throws with a German error message.
+ */
+function parseImportedOptions(raw: unknown): OptionExportEntry[] {
+  const rawArray = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object" && Array.isArray((raw as OptionsExportFile).options)
+      ? (raw as OptionsExportFile).options
+      : null;
+
+  if (!rawArray) {
+    throw new Error('Ungültiges Format: erwartet { "options": [...] } oder [...]');
+  }
+
+  if (rawArray.length === 0) {
+    throw new Error("Die Datei enthält keine Optionen");
+  }
+
+  if (rawArray.length > MAX_IMPORT_OPTIONS) {
+    throw new Error(`Maximal ${MAX_IMPORT_OPTIONS} Optionen pro Import erlaubt`);
+  }
+
+  return rawArray.map((entry, index) => {
+    if (!entry || typeof entry !== "object") {
+      throw new Error(`Eintrag ${index + 1}: kein Objekt`);
+    }
+    const title = (entry as Record<string, unknown>).title;
+    const description = (entry as Record<string, unknown>).description;
+    if (typeof title !== "string" || title.trim() === "") {
+      throw new Error(`Eintrag ${index + 1}: "title" fehlt oder ist leer`);
+    }
+    if (description !== undefined && typeof description !== "string") {
+      throw new Error(`Eintrag ${index + 1}: "description" muss ein String sein`);
+    }
+    return {
+      title: title.trim(),
+      ...(description && description.trim() !== ""
+        ? { description: description.trim() }
+        : {}),
+    };
+  });
+}
 
 interface OptionsListProps {
   surveyId: string;
@@ -36,6 +92,8 @@ export default function OptionsList({
   const [editDescription, setEditDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toast = useToast();
 
   const canAddOptions = surveyStatus === "optionen_sammeln";
@@ -141,6 +199,73 @@ export default function OptionsList({
     }
   }
 
+  function handleExportOptions() {
+    const payload: OptionsExportFile = {
+      options: options.map((o) => ({
+        title: o.title,
+        ...(o.description ? { description: o.description } : {}),
+      })),
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `umfrage-optionen-${surveyId}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+
+    toast.success("Optionen exportiert");
+  }
+
+  async function handleImportFileSelected(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file = event.target.files?.[0];
+    // Reset immediately so picking the same file again triggers onChange.
+    event.target.value = "";
+    if (!file) return;
+
+    setError(null);
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new Error("Die Datei enthält kein gültiges JSON");
+      }
+
+      const importOptions = parseImportedOptions(parsed);
+
+      const data = await api.post<{ options: SurveyOption[] }>(
+        `/api/surveys/${surveyId}/options/import`,
+        { options: importOptions }
+      );
+
+      // Socket broadcast will refresh other clients; update locally too.
+      setOptions((prev) => [...prev, ...data.options]);
+      toast.success(
+        data.options.length === 1
+          ? "1 Option importiert"
+          : `${data.options.length} Optionen importiert`
+      );
+      onOptionsChange?.();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Import fehlgeschlagen";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
   function startEditing(option: SurveyOption) {
     setEditingId(option.id);
     setEditTitle(option.title);
@@ -153,6 +278,8 @@ export default function OptionsList({
   }
 
   const canReorderOptions = canEditOptions && canManage;
+  const canImportOptions = canAddOptions && canManage;
+  const canExportOptions = options.length > 0;
 
   if (isLoading) {
     return <OptionsListSkeleton />;
@@ -160,9 +287,44 @@ export default function OptionsList({
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-      <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-        Optionen ({options.length})
-      </h2>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Optionen ({options.length})
+        </h2>
+        {(canExportOptions || canImportOptions) && (
+          <div className="flex shrink-0 gap-2">
+            {canExportOptions && (
+              <button
+                type="button"
+                onClick={handleExportOptions}
+                className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Exportieren
+              </button>
+            )}
+            {canImportOptions && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  onChange={handleImportFileSelected}
+                  className="hidden"
+                  aria-hidden="true"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isImporting}
+                  className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs text-zinc-600 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  {isImporting ? "Importiere..." : "Importieren"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {error && (
         <p className="mb-4 text-sm text-red-500 dark:text-red-400">{error}</p>

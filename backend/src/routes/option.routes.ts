@@ -3,7 +3,12 @@ import { optionController } from '../controllers/option.controller';
 import { validate } from '../middleware/validate';
 import { optionalAuth } from '../middleware/optionalAuth';
 import { requireRole } from '../middleware/surveyRole';
-import { createOptionSchema, updateOptionSchema, moveOptionSchema } from '../validators/option.schema';
+import {
+  createOptionSchema,
+  updateOptionSchema,
+  moveOptionSchema,
+  importOptionsSchema,
+} from '../validators/option.schema';
 
 const optionRouter = Router();
 
@@ -21,6 +26,14 @@ optionRouter.post(
   optionalAuth,
   validate(createOptionSchema),
   (req, res, next) => optionController.createOption(req, res, next)
+);
+
+// Bulk-import options from JSON (host/co-host only)
+optionRouter.post(
+  '/surveys/:id/options/import',
+  optionalAuth,
+  validate(importOptionsSchema),
+  (req, res, next) => optionController.importOptions(req, res, next)
 );
 
 // Update option

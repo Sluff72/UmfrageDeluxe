@@ -20,3 +20,8 @@ export interface UpdateOptionInput {
   title?: string;
   description?: string;
 }
+
+export interface ImportOptionInput {
+  title: string;
+  description?: string;
+}

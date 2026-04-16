@@ -6,6 +6,7 @@ import type {
   CreateOptionSchemaInput,
   UpdateOptionSchemaInput,
   MoveOptionSchemaInput,
+  ImportOptionsSchemaInput,
 } from '../validators/option.schema';
 
 export class OptionController {
@@ -99,6 +100,43 @@ export class OptionController {
       }
 
       res.json({ options });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async importOptions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const surveyId = req.params.id as string;
+      const input: ImportOptionsSchemaInput = req.body;
+      const userId = req.user?.sub ?? null;
+
+      const participantId = optionService.resolveParticipantId(
+        surveyId,
+        userId,
+        req.participant
+      );
+
+      const options = optionService.importOptions(
+        surveyId,
+        input.options,
+        userId,
+        participantId
+      );
+
+      // Broadcast each new option individually so clients stay consistent
+      // with the existing option:added flow.
+      try {
+        const io = getSocketServer();
+        const room = buildSurveyRoomName(surveyId);
+        for (const option of options) {
+          io.to(room).emit(SOCKET_EVENTS.OPTION_ADDED, { option });
+        }
+      } catch {
+        // Socket.IO not initialized – skip
+      }
+
+      res.status(201).json({ options });
     } catch (error) {
       next(error);
     }
