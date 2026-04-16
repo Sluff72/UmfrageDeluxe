@@ -10,6 +10,7 @@ import type {
   OptionAddedPayload,
   OptionUpdatedPayload,
   OptionRemovedPayload,
+  OptionReorderedPayload,
   VoteReceivedPayload,
   ObjectionAddedPayload,
   ObjectionStatusChangedPayload,
@@ -22,6 +23,7 @@ export interface SurveySocketCallbacks {
   onOptionAdded?: (payload: OptionAddedPayload) => void;
   onOptionUpdated?: (payload: OptionUpdatedPayload) => void;
   onOptionRemoved?: (payload: OptionRemovedPayload) => void;
+  onOptionsReordered?: (payload: OptionReorderedPayload) => void;
   onVoteReceived?: (payload: VoteReceivedPayload) => void;
   onObjectionAdded?: (payload: ObjectionAddedPayload) => void;
   onObjectionStatusChanged?: (payload: ObjectionStatusChangedPayload) => void;
@@ -91,6 +93,10 @@ export function useSurveySocket(
 
     socket.on(SOCKET_EVENTS.OPTION_REMOVED, (payload: OptionRemovedPayload) => {
       callbacksRef.current.onOptionRemoved?.(payload);
+    });
+
+    socket.on(SOCKET_EVENTS.OPTION_REORDERED, (payload: OptionReorderedPayload) => {
+      callbacksRef.current.onOptionsReordered?.(payload);
     });
 
     socket.on(SOCKET_EVENTS.VOTE_RECEIVED, (payload: VoteReceivedPayload) => {

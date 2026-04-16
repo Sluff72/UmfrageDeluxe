@@ -1,7 +1,7 @@
 import { getDatabase } from '../config/database';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors';
 import { surveyService } from './survey.service';
-import type { Option, CreateOptionInput, UpdateOptionInput } from '../types/option.types';
+import type { Option, CreateOptionInput, UpdateOptionInput, MoveDirection } from '../types/option.types';
 import type { SurveyParticipant } from '../types/user.types';
 
 export class OptionService {
@@ -18,17 +18,25 @@ export class OptionService {
 
     const database = getDatabase();
 
+    const nextPosition = database
+      .prepare(
+        `SELECT COALESCE(MAX(position), -1) + 1 AS next_position
+         FROM options WHERE survey_id = ?`
+      )
+      .get(surveyId) as { next_position: number };
+
     const option = database
       .prepare(
-        `INSERT INTO options (survey_id, title, description, created_by)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO options (survey_id, title, description, created_by, position)
+         VALUES (?, ?, ?, ?, ?)
          RETURNING *`
       )
       .get(
         surveyId,
         input.title,
         input.description ?? null,
-        participantId
+        participantId,
+        nextPosition.next_position
       ) as Option;
 
     return option;
@@ -43,7 +51,9 @@ export class OptionService {
     const database = getDatabase();
 
     return database
-      .prepare('SELECT * FROM options WHERE survey_id = ? ORDER BY created_at ASC')
+      .prepare(
+        'SELECT * FROM options WHERE survey_id = ? ORDER BY position ASC, created_at ASC'
+      )
       .all(surveyId) as Option[];
   }
 
@@ -132,6 +142,75 @@ export class OptionService {
   }
 
   /**
+   * Move an option up or down within its survey by swapping `position`
+   * with the adjacent option. Host/Co-Host only, and only while the
+   * survey is in the `optionen_sammeln` phase.
+   */
+  moveOption(
+    optionId: string,
+    direction: MoveDirection,
+    userId: string | null
+  ): Option[] {
+    const option = this.getOptionById(optionId);
+    const survey = surveyService.getSurveyById(option.survey_id);
+
+    if (survey.status !== 'optionen_sammeln') {
+      throw new ForbiddenError(
+        'Optionen können nur in der Phase "Optionen Sammeln" sortiert werden'
+      );
+    }
+
+    this.assertHostOrCoHost(
+      option.survey_id,
+      userId,
+      'Nur Host oder Co-Host können Optionen sortieren'
+    );
+
+    const database = getDatabase();
+
+    // Find the neighbour in the requested direction.
+    const neighbour = (
+      direction === 'up'
+        ? database
+            .prepare(
+              `SELECT * FROM options
+               WHERE survey_id = ? AND position < ?
+               ORDER BY position DESC LIMIT 1`
+            )
+            .get(option.survey_id, option.position)
+        : database
+            .prepare(
+              `SELECT * FROM options
+               WHERE survey_id = ? AND position > ?
+               ORDER BY position ASC LIMIT 1`
+            )
+            .get(option.survey_id, option.position)
+    ) as Option | undefined;
+
+    if (!neighbour) {
+      throw new ValidationError(
+        direction === 'up'
+          ? 'Option ist bereits ganz oben'
+          : 'Option ist bereits ganz unten'
+      );
+    }
+
+    const swap = database.transaction(() => {
+      // Two-step swap to avoid unique-index collisions in the future.
+      database
+        .prepare(`UPDATE options SET position = ? WHERE id = ?`)
+        .run(neighbour.position, option.id);
+      database
+        .prepare(`UPDATE options SET position = ? WHERE id = ?`)
+        .run(option.position, neighbour.id);
+    });
+
+    swap();
+
+    return this.listOptionsForSurvey(option.survey_id);
+  }
+
+  /**
    * Resolve the participant ID for the current user in a given survey.
    */
   resolveParticipantId(surveyId: string, userId: string | null, participant: SurveyParticipant | undefined): string {
@@ -158,9 +237,13 @@ export class OptionService {
     return found.id;
   }
 
-  private assertHostOrCoHost(surveyId: string, userId: string | null): void {
+  private assertHostOrCoHost(
+    surveyId: string,
+    userId: string | null,
+    errorMessage = 'Nur Host oder Co-Host können fremde Optionen bearbeiten'
+  ): void {
     if (!userId) {
-      throw new ForbiddenError('Nur Host oder Co-Host können fremde Optionen bearbeiten');
+      throw new ForbiddenError(errorMessage);
     }
 
     const database = getDatabase();
@@ -172,7 +255,7 @@ export class OptionService {
       .get(surveyId, userId);
 
     if (!participant) {
-      throw new ForbiddenError('Nur Host oder Co-Host können fremde Optionen bearbeiten');
+      throw new ForbiddenError(errorMessage);
     }
   }
 }

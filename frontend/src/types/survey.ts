@@ -57,6 +57,7 @@ export interface SurveyOption {
   title: string;
   description: string | null;
   created_by: string;
+  position: number;
   created_at: string;
   updated_at: string;
 }

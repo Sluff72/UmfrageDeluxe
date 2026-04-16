@@ -111,6 +111,21 @@ export default function OptionsList({
     }
   }
 
+  async function handleMoveOption(optionId: string, direction: "up" | "down") {
+    setError(null);
+    try {
+      const data = await api.post<{ options: SurveyOption[] }>(
+        `/api/options/${optionId}/move`,
+        { direction }
+      );
+      setOptions(data.options);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Option konnte nicht verschoben werden"
+      );
+    }
+  }
+
   async function handleDeleteOption(optionId: string) {
     setDeleteTarget(null);
     setError(null);
@@ -137,6 +152,8 @@ export default function OptionsList({
     return option.created_by === currentParticipantId || canManage;
   }
 
+  const canReorderOptions = canEditOptions && canManage;
+
   if (isLoading) {
     return <OptionsListSkeleton />;
   }
@@ -160,7 +177,7 @@ export default function OptionsList({
         />
       ) : (
         <div className="mb-4 space-y-3">
-          {options.map((option) => (
+          {options.map((option, index) => (
             <div
               key={option.id}
               className="rounded-lg border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800"
@@ -199,6 +216,26 @@ export default function OptionsList({
               ) : (
                 /* Display mode */
                 <div className="flex items-start justify-between gap-2">
+                  {canReorderOptions && (
+                    <div className="flex shrink-0 flex-col gap-0.5">
+                      <button
+                        onClick={() => handleMoveOption(option.id, "up")}
+                        disabled={index === 0}
+                        aria-label={`Option "${option.title}" nach oben verschieben`}
+                        className="rounded px-1.5 py-0.5 text-xs leading-none text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        onClick={() => handleMoveOption(option.id, "down")}
+                        disabled={index === options.length - 1}
+                        aria-label={`Option "${option.title}" nach unten verschieben`}
+                        className="rounded px-1.5 py-0.5 text-xs leading-none text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-zinc-500 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                  )}
                   <div className="flex-1">
                     <p className="font-medium text-zinc-900 dark:text-zinc-100">
                       {option.title}

@@ -3,7 +3,7 @@ import { optionController } from '../controllers/option.controller';
 import { validate } from '../middleware/validate';
 import { optionalAuth } from '../middleware/optionalAuth';
 import { requireRole } from '../middleware/surveyRole';
-import { createOptionSchema, updateOptionSchema } from '../validators/option.schema';
+import { createOptionSchema, updateOptionSchema, moveOptionSchema } from '../validators/option.schema';
 
 const optionRouter = Router();
 
@@ -29,6 +29,14 @@ optionRouter.put(
   optionalAuth,
   validate(updateOptionSchema),
   (req, res, next) => optionController.updateOption(req, res, next)
+);
+
+// Move option up/down (host/co-host only)
+optionRouter.post(
+  '/options/:optionId/move',
+  optionalAuth,
+  validate(moveOptionSchema),
+  (req, res, next) => optionController.moveOption(req, res, next)
 );
 
 // Delete option
