@@ -9,6 +9,18 @@ import type {
 } from '../types/survey.types';
 import type { SurveyParticipant } from '../types/user.types';
 
+const DUPLICATE_TITLE_PREFIX = 'Kopie von ';
+const TITLE_MAX_LENGTH = 300;
+
+function buildDuplicateTitle(originalTitle: string): string {
+  const withPrefix = `${DUPLICATE_TITLE_PREFIX}${originalTitle}`;
+  if (withPrefix.length <= TITLE_MAX_LENGTH) {
+    return withPrefix;
+  }
+  // Preserve the prefix so the copy remains identifiable even when we truncate.
+  return withPrefix.slice(0, TITLE_MAX_LENGTH);
+}
+
 export class SurveyService {
   createSurvey(input: CreateSurveyInput, userId: string): Survey {
     const database = getDatabase();
@@ -127,6 +139,69 @@ export class SurveyService {
 
     const database = getDatabase();
     database.prepare('DELETE FROM surveys WHERE id = ?').run(surveyId);
+  }
+
+  /**
+   * Duplicate a survey. Only the host or a co-host of the original survey
+   * can perform this action. The copy:
+   *   - starts directly in the `optionen_sammeln` phase
+   *   - is owned by the duplicating user (they become the new host)
+   *   - inherits the voting method, budget, description and anonymity setting
+   *   - copies all options (title, description, position) attributed to the new host
+   *
+   * Votes, objections and participants of the original are NOT copied.
+   */
+  duplicateSurvey(surveyId: string, userId: string): Survey {
+    const original = this.getSurveyById(surveyId);
+    this.assertHostOrCoHost(surveyId, userId);
+
+    const database = getDatabase();
+    const newInviteCode = this.generateUniqueInviteCode();
+    const newTitle = buildDuplicateTitle(original.title);
+
+    const duplicateTransaction = database.transaction(() => {
+      const newSurvey = database
+        .prepare(
+          `INSERT INTO surveys (
+              title, description, status, voting_method,
+              w_max, max_points_per_option,
+              invite_code, allow_anonymous, created_by
+            )
+            VALUES (?, ?, 'optionen_sammeln', ?, ?, ?, ?, ?, ?)
+            RETURNING *`
+        )
+        .get(
+          newTitle,
+          original.description,
+          original.voting_method,
+          original.w_max,
+          original.max_points_per_option,
+          newInviteCode,
+          original.allow_anonymous,
+          userId
+        ) as Survey;
+
+      const newHostParticipant = database
+        .prepare(
+          `INSERT INTO survey_participants (survey_id, user_id, role)
+           VALUES (?, ?, 'host')
+           RETURNING id`
+        )
+        .get(newSurvey.id, userId) as { id: string };
+
+      database
+        .prepare(
+          `INSERT INTO options (survey_id, title, description, created_by, position)
+           SELECT ?, title, description, ?, position
+             FROM options
+            WHERE survey_id = ?`
+        )
+        .run(newSurvey.id, newHostParticipant.id, surveyId);
+
+      return newSurvey;
+    });
+
+    return duplicateTransaction();
   }
 
   archiveSurvey(surveyId: string, userId: string): Survey {

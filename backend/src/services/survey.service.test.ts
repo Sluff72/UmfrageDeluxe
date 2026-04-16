@@ -613,4 +613,227 @@ describe('SurveyService', () => {
       ).toThrow(ForbiddenError);
     });
   });
+
+  // =========================================================================
+  // duplicateSurvey
+  // =========================================================================
+
+  describe('duplicateSurvey', () => {
+    function createOriginalSurveyWithOptions(hostId: string): Survey {
+      const original = service.createSurvey(
+        {
+          title: 'Original',
+          description: 'Eine Beschreibung',
+          votingMethod: 'widerstand_punkte',
+          wMax: 25,
+          maxPointsPerOption: 5,
+          allowAnonymous: false,
+        },
+        hostId
+      );
+      setSurveyStatus(original.id, 'optionen_sammeln');
+
+      const db = getDatabase();
+      const hostParticipant = db
+        .prepare(
+          'SELECT id FROM survey_participants WHERE survey_id = ? AND user_id = ?'
+        )
+        .get(original.id, hostId) as { id: string };
+
+      // Seed options with varying positions
+      db.prepare(
+        `INSERT INTO options (survey_id, title, description, created_by, position)
+         VALUES (?, 'A', 'Opt A', ?, 0),
+                (?, 'B', NULL,    ?, 1),
+                (?, 'C', 'Opt C', ?, 2)`
+      ).run(
+        original.id,
+        hostParticipant.id,
+        original.id,
+        hostParticipant.id,
+        original.id,
+        hostParticipant.id
+      );
+
+      return original;
+    }
+
+    it('should duplicate a survey into optionen_sammeln owned by the duplicator', async () => {
+      const hostId = await createTestUser('host');
+      const original = service.createSurvey(
+        { title: 'Meine Umfrage', votingMethod: 'widerstand' },
+        hostId
+      );
+
+      const copy = service.duplicateSurvey(original.id, hostId);
+
+      expect(copy.id).not.toBe(original.id);
+      expect(copy.title).toBe('Kopie von Meine Umfrage');
+      expect(copy.status).toBe('optionen_sammeln');
+      expect(copy.voting_method).toBe('widerstand');
+      expect(copy.created_by).toBe(hostId);
+      expect(copy.invite_code).not.toBe(original.invite_code);
+    });
+
+    it('should carry over description, w_max, max_points_per_option and allow_anonymous', async () => {
+      const hostId = await createTestUser();
+      const original = createOriginalSurveyWithOptions(hostId);
+
+      const copy = service.duplicateSurvey(original.id, hostId);
+
+      expect(copy.description).toBe('Eine Beschreibung');
+      expect(copy.w_max).toBe(25);
+      expect(copy.max_points_per_option).toBe(5);
+      expect(copy.allow_anonymous).toBe(0);
+    });
+
+    it('should copy all options preserving title, description and position', async () => {
+      const hostId = await createTestUser();
+      const original = createOriginalSurveyWithOptions(hostId);
+
+      const copy = service.duplicateSurvey(original.id, hostId);
+
+      const db = getDatabase();
+      const rows = db
+        .prepare(
+          'SELECT title, description, position FROM options WHERE survey_id = ? ORDER BY position ASC'
+        )
+        .all(copy.id) as { title: string; description: string | null; position: number }[];
+
+      expect(rows).toEqual([
+        { title: 'A', description: 'Opt A', position: 0 },
+        { title: 'B', description: null, position: 1 },
+        { title: 'C', description: 'Opt C', position: 2 },
+      ]);
+    });
+
+    it('should attribute copied options to the new host participant', async () => {
+      const hostId = await createTestUser();
+      const original = createOriginalSurveyWithOptions(hostId);
+
+      const copy = service.duplicateSurvey(original.id, hostId);
+
+      const db = getDatabase();
+      const newHost = db
+        .prepare(
+          `SELECT id FROM survey_participants WHERE survey_id = ? AND user_id = ? AND role = 'host'`
+        )
+        .get(copy.id, hostId) as { id: string };
+
+      const optionCreators = db
+        .prepare('SELECT DISTINCT created_by FROM options WHERE survey_id = ?')
+        .all(copy.id) as { created_by: string }[];
+
+      expect(optionCreators).toHaveLength(1);
+      expect(optionCreators[0].created_by).toBe(newHost.id);
+    });
+
+    it('should not copy original participants, votes or objections', async () => {
+      const hostId = await createTestUser('host');
+      const otherId = await createTestUser('other');
+      const original = createOriginalSurveyWithOptions(hostId);
+
+      // Add a second participant on the original
+      service.joinSurveyByInviteCode(original.invite_code, otherId, null, null);
+
+      const copy = service.duplicateSurvey(original.id, hostId);
+
+      const db = getDatabase();
+      const participants = db
+        .prepare('SELECT * FROM survey_participants WHERE survey_id = ?')
+        .all(copy.id) as { user_id: string; role: string }[];
+
+      expect(participants).toHaveLength(1);
+      expect(participants[0].user_id).toBe(hostId);
+      expect(participants[0].role).toBe('host');
+    });
+
+    it('should allow a co-host of the original to duplicate', async () => {
+      const hostId = await createTestUser('host');
+      const coHostId = await createTestUser('cohost');
+      const original = service.createSurvey(
+        { title: 'Team-Umfrage', votingMethod: 'widerstand' },
+        hostId
+      );
+      service.addCoHost(original.id, coHostId, hostId);
+
+      const copy = service.duplicateSurvey(original.id, coHostId);
+
+      expect(copy.created_by).toBe(coHostId);
+
+      const db = getDatabase();
+      const host = db
+        .prepare(
+          `SELECT user_id FROM survey_participants WHERE survey_id = ? AND role = 'host'`
+        )
+        .get(copy.id) as { user_id: string };
+      expect(host.user_id).toBe(coHostId);
+    });
+
+    it('should forbid regular participants from duplicating', async () => {
+      const hostId = await createTestUser('host');
+      const memberId = await createTestUser('member');
+      const original = service.createSurvey(
+        { title: 'X', votingMethod: 'widerstand' },
+        hostId
+      );
+      service.joinSurveyByInviteCode(original.invite_code, memberId, null, null);
+
+      expect(() => service.duplicateSurvey(original.id, memberId)).toThrow(
+        ForbiddenError
+      );
+    });
+
+    it('should forbid users who are not participants of the original', async () => {
+      const hostId = await createTestUser('host');
+      const outsiderId = await createTestUser('outsider');
+      const original = service.createSurvey(
+        { title: 'X', votingMethod: 'widerstand' },
+        hostId
+      );
+
+      expect(() => service.duplicateSurvey(original.id, outsiderId)).toThrow(
+        ForbiddenError
+      );
+    });
+
+    it('should throw NotFoundError for unknown survey id', async () => {
+      const userId = await createTestUser();
+      expect(() => service.duplicateSurvey('nonexistent-id', userId)).toThrow(
+        NotFoundError
+      );
+    });
+
+    it('should truncate the prefixed title to 300 chars', async () => {
+      const hostId = await createTestUser();
+      const longTitle = 'A'.repeat(300);
+      const original = service.createSurvey(
+        { title: longTitle, votingMethod: 'widerstand' },
+        hostId
+      );
+
+      const copy = service.duplicateSurvey(original.id, hostId);
+      expect(copy.title.length).toBe(300);
+      expect(copy.title.startsWith('Kopie von ')).toBe(true);
+    });
+
+    it('should be idempotent w.r.t. the original survey (original stays unchanged)', async () => {
+      const hostId = await createTestUser();
+      const original = createOriginalSurveyWithOptions(hostId);
+      const beforeSnapshot = service.getSurveyById(original.id);
+
+      service.duplicateSurvey(original.id, hostId);
+
+      const afterSnapshot = service.getSurveyById(original.id);
+      expect(afterSnapshot.title).toBe(beforeSnapshot.title);
+      expect(afterSnapshot.status).toBe(beforeSnapshot.status);
+      expect(afterSnapshot.invite_code).toBe(beforeSnapshot.invite_code);
+
+      const db = getDatabase();
+      const originalOptions = db
+        .prepare('SELECT COUNT(*) as n FROM options WHERE survey_id = ?')
+        .get(original.id) as { n: number };
+      expect(originalOptions.n).toBe(3);
+    });
+  });
 });

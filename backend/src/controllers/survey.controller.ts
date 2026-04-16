@@ -70,6 +70,18 @@ export class SurveyController {
     }
   }
 
+  async duplicateSurvey(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const surveyId = req.params.id as string;
+      const userId = req.user!.sub;
+
+      const survey = surveyService.duplicateSurvey(surveyId, userId);
+      res.status(201).json({ survey });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async archiveSurvey(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const surveyId = req.params.id as string;
