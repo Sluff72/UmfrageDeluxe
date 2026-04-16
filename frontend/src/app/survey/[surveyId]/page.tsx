@@ -37,6 +37,7 @@ export default function SurveyDetailPage() {
   const toast = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
+  const [isDuplicating, setIsDuplicating] = useState(false);
 
   const surveyId = params.surveyId as string;
   const { getToken } = useParticipantToken(surveyId);
@@ -159,6 +160,22 @@ export default function SurveyDetailPage() {
       router.push("/dashboard");
     } catch {
       setError("Umfrage konnte nicht gelöscht werden");
+    }
+  }
+
+  async function handleDuplicate() {
+    setIsDuplicating(true);
+    try {
+      const data = await api.post<{ survey: Survey }>(
+        `/api/surveys/${surveyId}/duplicate`
+      );
+      toast.success("Umfrage dupliziert");
+      router.push(`/survey/${data.survey.id}`);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Duplizieren fehlgeschlagen"
+      );
+      setIsDuplicating(false);
     }
   }
 
@@ -375,13 +392,20 @@ export default function SurveyDetailPage() {
             )}
 
             {/* Actions */}
-            {isHost && (
+            {canManage && (
               <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
                 <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                   Aktionen
                 </h3>
                 <div className="space-y-2">
-                  {survey.status === "beendet" && !survey.is_archived && (
+                  <button
+                    onClick={handleDuplicate}
+                    disabled={isDuplicating}
+                    className="w-full rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    {isDuplicating ? "Dupliziere..." : "Umfrage duplizieren"}
+                  </button>
+                  {isHost && survey.status === "beendet" && !survey.is_archived && (
                     <button
                       onClick={() => setShowArchiveConfirm(true)}
                       className="w-full rounded-lg border border-zinc-300 px-4 py-2 text-sm text-zinc-700 transition hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -389,17 +413,19 @@ export default function SurveyDetailPage() {
                       Umfrage archivieren
                     </button>
                   )}
-                  {survey.is_archived && (
+                  {isHost && survey.is_archived && (
                     <div className="rounded-lg bg-zinc-100 px-4 py-2 text-center text-sm text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                       Archiviert
                     </div>
                   )}
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 transition hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"
-                  >
-                    Umfrage l&ouml;schen
-                  </button>
+                  {isHost && (
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="w-full rounded-lg border border-red-200 px-4 py-2 text-sm text-red-600 transition hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/30"
+                    >
+                      Umfrage l&ouml;schen
+                    </button>
+                  )}
                 </div>
               </div>
             )}

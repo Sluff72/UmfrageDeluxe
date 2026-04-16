@@ -57,6 +57,13 @@ surveyRouter.post(
   (req, res, next) => surveyController.archiveSurvey(req, res, next)
 );
 
+// Duplicate survey (host or co-host of the original)
+surveyRouter.post(
+  '/surveys/:id/duplicate',
+  requireAuth,
+  (req, res, next) => surveyController.duplicateSurvey(req, res, next)
+);
+
 // Participant role management (host only)
 surveyRouter.put(
   '/surveys/:id/participants/:participantId/role',
