@@ -3,7 +3,7 @@ import argon2 from 'argon2';
 import { getDatabase } from '../config/database';
 import { OptionService } from './option.service';
 import { SurveyService } from './survey.service';
-import { NotFoundError, ForbiddenError } from '../utils/errors';
+import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors';
 import type { Survey } from '../types/survey.types';
 import type { SurveyParticipant } from '../types/user.types';
 
@@ -863,6 +863,153 @@ describe('OptionService', () => {
       expect(() => service.moveOption('nonexistent-id', 'up', userId)).toThrow(
         NotFoundError
       );
+    });
+  });
+
+  // =========================================================================
+  // importOptions
+  // =========================================================================
+
+  describe('importOptions', () => {
+    it('should import multiple options as a host during optionen_sammeln', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      const imported = service.importOptions(
+        survey.id,
+        [
+          { title: 'Option 1', description: 'First' },
+          { title: 'Option 2' },
+          { title: 'Option 3', description: 'Third' },
+        ],
+        userId,
+        participantId
+      );
+
+      expect(imported).toHaveLength(3);
+      expect(imported.map((o) => o.title)).toEqual(['Option 1', 'Option 2', 'Option 3']);
+      expect(imported[0].description).toBe('First');
+      expect(imported[1].description).toBeNull();
+      expect(imported.every((o) => o.created_by === participantId)).toBe(true);
+    });
+
+    it('should continue position sequence after existing options', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      service.createOption(survey.id, { title: 'A' }, participantId);
+      service.createOption(survey.id, { title: 'B' }, participantId);
+
+      const imported = service.importOptions(
+        survey.id,
+        [{ title: 'C' }, { title: 'D' }],
+        userId,
+        participantId
+      );
+
+      expect(imported[0].position).toBe(2);
+      expect(imported[1].position).toBe(3);
+
+      const all = service.listOptionsForSurvey(survey.id);
+      expect(all.map((o) => o.title)).toEqual(['A', 'B', 'C', 'D']);
+    });
+
+    it('should allow a co-host to import options', async () => {
+      const hostId = await createTestUser('host');
+      const coHostId = await createTestUser('cohost');
+      const survey = createTestSurvey(hostId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      surveyService.addCoHost(survey.id, coHostId, hostId);
+      const coHostParticipantId = getParticipantId(survey.id, coHostId);
+
+      const imported = service.importOptions(
+        survey.id,
+        [{ title: 'Co-Host Option' }],
+        coHostId,
+        coHostParticipantId
+      );
+
+      expect(imported).toHaveLength(1);
+      expect(imported[0].created_by).toBe(coHostParticipantId);
+    });
+
+    it('should forbid regular participants from importing options', async () => {
+      const hostId = await createTestUser('host');
+      const memberId = await createTestUser('member');
+      const survey = createTestSurvey(hostId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      surveyService.joinSurveyByInviteCode(
+        survey.invite_code,
+        memberId,
+        null,
+        null
+      );
+
+      const memberParticipantId = getParticipantId(survey.id, memberId);
+
+      expect(() =>
+        service.importOptions(
+          survey.id,
+          [{ title: 'X' }],
+          memberId,
+          memberParticipantId
+        )
+      ).toThrow(ForbiddenError);
+    });
+
+    it('should forbid anonymous callers (no userId) from importing', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      expect(() =>
+        service.importOptions(survey.id, [{ title: 'X' }], null, participantId)
+      ).toThrow(ForbiddenError);
+    });
+
+    it('should reject imports outside optionen_sammeln phase', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'abstimmen');
+      const participantId = getParticipantId(survey.id, userId);
+
+      expect(() =>
+        service.importOptions(survey.id, [{ title: 'X' }], userId, participantId)
+      ).toThrow(ForbiddenError);
+    });
+
+    it('should throw ValidationError for empty option array', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      expect(() =>
+        service.importOptions(survey.id, [], userId, participantId)
+      ).toThrow(ValidationError);
+    });
+
+    it('should throw NotFoundError for unknown surveyId', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      expect(() =>
+        service.importOptions(
+          'nonexistent-survey-id',
+          [{ title: 'X' }],
+          userId,
+          participantId
+        )
+      ).toThrow(NotFoundError);
     });
   });
 });

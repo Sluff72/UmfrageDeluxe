@@ -1,7 +1,13 @@
 import { getDatabase } from '../config/database';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/errors';
 import { surveyService } from './survey.service';
-import type { Option, CreateOptionInput, UpdateOptionInput, MoveDirection } from '../types/option.types';
+import type {
+  Option,
+  CreateOptionInput,
+  UpdateOptionInput,
+  MoveDirection,
+  ImportOptionInput,
+} from '../types/option.types';
 import type { SurveyParticipant } from '../types/user.types';
 
 export class OptionService {
@@ -208,6 +214,68 @@ export class OptionService {
     swap();
 
     return this.listOptionsForSurvey(option.survey_id);
+  }
+
+  /**
+   * Bulk-import options for a survey. Host/Co-Host only, and only while the
+   * survey is in the `optionen_sammeln` phase. Imported options are appended
+   * after any existing options (continuing the `position` sequence) and are
+   * attributed to the importing participant via `created_by`.
+   */
+  importOptions(
+    surveyId: string,
+    options: ImportOptionInput[],
+    userId: string | null,
+    participantId: string
+  ): Option[] {
+    const survey = surveyService.getSurveyById(surveyId);
+
+    if (survey.status !== 'optionen_sammeln') {
+      throw new ForbiddenError(
+        'Optionen können nur in der Phase "Optionen Sammeln" importiert werden'
+      );
+    }
+
+    this.assertHostOrCoHost(
+      surveyId,
+      userId,
+      'Nur Host oder Co-Host können Optionen importieren'
+    );
+
+    if (options.length === 0) {
+      throw new ValidationError('Mindestens eine Option erforderlich');
+    }
+
+    const database = getDatabase();
+
+    const insertStatement = database.prepare(
+      `INSERT INTO options (survey_id, title, description, created_by, position)
+       VALUES (?, ?, ?, ?, ?)
+       RETURNING *`
+    );
+
+    const getNextPositionStatement = database.prepare(
+      `SELECT COALESCE(MAX(position), -1) + 1 AS next_position
+       FROM options WHERE survey_id = ?`
+    );
+
+    const importTransaction = database.transaction(() => {
+      const { next_position: startPosition } = getNextPositionStatement.get(
+        surveyId
+      ) as { next_position: number };
+
+      return options.map((input, index) =>
+        insertStatement.get(
+          surveyId,
+          input.title,
+          input.description ?? null,
+          participantId,
+          startPosition + index
+        ) as Option
+      );
+    });
+
+    return importTransaction();
   }
 
   /**
