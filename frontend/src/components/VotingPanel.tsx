@@ -40,7 +40,10 @@ export default function VotingPanel({
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
 
-  const effectiveMaxPerOption = maxPointsPerOption ?? 10;
+  // `max_points_per_option` is only semantically meaningful for `widerstand_punkte`.
+  // For the pure `widerstand` method the scale is always 0–10.
+  const effectiveMaxPerOption =
+    votingMethod === "widerstand_punkte" ? (maxPointsPerOption ?? 10) : 10;
   const isResistance =
     votingMethod === "widerstand_punkte" || votingMethod === "widerstand";
 
