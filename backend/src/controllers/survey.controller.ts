@@ -52,6 +52,16 @@ export class SurveyController {
       const userId = req.user!.sub;
 
       const survey = surveyService.updateSurvey(surveyId, input, userId);
+
+      // Broadcast so other clients (e.g. participants looking at the details
+      // panel) see the new configuration without a manual reload.
+      try {
+        const io = getSocketServer();
+        io.to(buildSurveyRoomName(surveyId)).emit(SOCKET_EVENTS.SURVEY_UPDATED, { survey });
+      } catch {
+        // Socket.IO not initialized (e.g. in tests) – skip broadcast
+      }
+
       res.json({ survey });
     } catch (error) {
       next(error);

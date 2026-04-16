@@ -7,6 +7,7 @@ import { getParticipantTokenForSurvey } from "@/hooks/useParticipantToken";
 import { SOCKET_EVENTS } from "@/types/socket";
 import type {
   PhaseChangedPayload,
+  SurveyUpdatedPayload,
   OptionAddedPayload,
   OptionUpdatedPayload,
   OptionRemovedPayload,
@@ -20,6 +21,7 @@ import type {
 
 export interface SurveySocketCallbacks {
   onPhaseChanged?: (payload: PhaseChangedPayload) => void;
+  onSurveyUpdated?: (payload: SurveyUpdatedPayload) => void;
   onOptionAdded?: (payload: OptionAddedPayload) => void;
   onOptionUpdated?: (payload: OptionUpdatedPayload) => void;
   onOptionRemoved?: (payload: OptionRemovedPayload) => void;
@@ -77,6 +79,10 @@ export function useSurveySocket(
     // Register event listeners
     socket.on(SOCKET_EVENTS.SURVEY_PHASE_CHANGED, (payload: PhaseChangedPayload) => {
       callbacksRef.current.onPhaseChanged?.(payload);
+    });
+
+    socket.on(SOCKET_EVENTS.SURVEY_UPDATED, (payload: SurveyUpdatedPayload) => {
+      callbacksRef.current.onSurveyUpdated?.(payload);
     });
 
     socket.on(SOCKET_EVENTS.SURVEY_PARTICIPANT_JOINED, (payload: ParticipantJoinedPayload) => {
