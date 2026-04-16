@@ -15,6 +15,7 @@ import VotingPanel from "@/components/VotingPanel";
 import ResultsPanel from "@/components/ResultsPanel";
 import ParticipantsList from "@/components/ParticipantsList";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import VotingMethodEditor from "@/components/VotingMethodEditor";
 import type { Survey, SurveyParticipant, TransitionInfo } from "@/types/survey";
 import {
   SURVEY_STATUS_LABELS,
@@ -38,6 +39,7 @@ export default function SurveyDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
+  const [showVotingMethodEditor, setShowVotingMethodEditor] = useState(false);
 
   const surveyId = params.surveyId as string;
   const { getToken } = useParticipantToken(surveyId);
@@ -132,6 +134,10 @@ export default function SurveyDetailPage() {
     onParticipantRoleChanged: () => {
       // Role changed (promote/demote) – re-fetch to update participants list and permissions
       fetchSurvey();
+    },
+    onSurveyUpdated: (payload) => {
+      // Voting-method/settings change by host/co-host – sync local state
+      setSurvey(payload.survey);
     },
   });
 
@@ -322,9 +328,22 @@ export default function SurveyDetailPage() {
           <div className="space-y-6">
             {/* Survey info */}
             <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                Details
-              </h3>
+              <div className="mb-4 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                  Details
+                </h3>
+                {canManage &&
+                  (survey.status === "entwurf" ||
+                    survey.status === "optionen_sammeln") && (
+                    <button
+                      type="button"
+                      onClick={() => setShowVotingMethodEditor(true)}
+                      className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                    >
+                      Ändern
+                    </button>
+                  )}
+              </div>
               <dl className="space-y-3 text-sm">
                 <div>
                   <dt className="text-zinc-400 dark:text-zinc-500">Methode</dt>
@@ -452,6 +471,14 @@ export default function SurveyDetailPage() {
         confirmLabel="Archivieren"
         onConfirm={handleArchive}
         onCancel={() => setShowArchiveConfirm(false)}
+      />
+
+      {/* Voting method editor (host/co-host in entwurf or optionen_sammeln) */}
+      <VotingMethodEditor
+        open={showVotingMethodEditor}
+        survey={survey}
+        onClose={() => setShowVotingMethodEditor(false)}
+        onUpdated={(updated) => setSurvey(updated)}
       />
     </div>
   );

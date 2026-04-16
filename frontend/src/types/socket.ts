@@ -29,12 +29,16 @@ export const SOCKET_EVENTS = {
 
 /* ── Payload types for Server → Client events ─────────────────── */
 
-import type { SurveyStatus, SurveyRole, SurveyOption } from "./survey";
+import type { Survey, SurveyStatus, SurveyRole, SurveyOption } from "./survey";
 
 export interface PhaseChangedPayload {
   surveyId: string;
   previousStatus: SurveyStatus;
   newStatus: SurveyStatus;
+}
+
+export interface SurveyUpdatedPayload {
+  survey: Survey;
 }
 
 export interface ParticipantJoinedPayload {

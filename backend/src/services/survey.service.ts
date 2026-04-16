@@ -101,8 +101,25 @@ export class SurveyService {
     const survey = this.getSurveyById(surveyId);
     this.assertHostOrCoHost(surveyId, userId);
 
-    if (survey.status !== 'entwurf') {
-      throw new ForbiddenError('Survey can only be edited in draft status');
+    if (survey.status !== 'entwurf' && survey.status !== 'optionen_sammeln') {
+      throw new ForbiddenError(
+        'Einstellungen können nur in den Phasen "Entwurf" und "Optionen Sammeln" geändert werden'
+      );
+    }
+
+    // In `optionen_sammeln`, only voting-related fields are editable.
+    // Options already exist and participants may have joined, so changing
+    // title/description/anonymity at that point is explicitly disallowed.
+    if (survey.status === 'optionen_sammeln') {
+      if (
+        input.title !== undefined ||
+        input.description !== undefined ||
+        input.allowAnonymous !== undefined
+      ) {
+        throw new ForbiddenError(
+          'In der Phase "Optionen Sammeln" können nur Abstimmungsmethode, W-Max und Punkte pro Option geändert werden'
+        );
+      }
     }
 
     const database = getDatabase();

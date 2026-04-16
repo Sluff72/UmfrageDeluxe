@@ -350,6 +350,149 @@ describe('SurveyService', () => {
         service.updateSurvey('nonexistent-id', { title: 'X' }, userId)
       ).toThrow(NotFoundError);
     });
+
+    // -----------------------------------------------------------------
+    // Editing in the "optionen_sammeln" phase
+    // -----------------------------------------------------------------
+
+    it('should allow changing votingMethod during optionen_sammeln', async () => {
+      const userId = await createTestUser();
+      const survey = service.createSurvey(
+        { title: 'S', votingMethod: 'widerstand' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      const updated = service.updateSurvey(
+        survey.id,
+        { votingMethod: 'widerstand_punkte' },
+        userId
+      );
+
+      expect(updated.voting_method).toBe('widerstand_punkte');
+    });
+
+    it('should allow changing wMax and maxPointsPerOption during optionen_sammeln', async () => {
+      const userId = await createTestUser();
+      const survey = service.createSurvey(
+        { title: 'S', votingMethod: 'widerstand_punkte' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      const updated = service.updateSurvey(
+        survey.id,
+        { wMax: 20, maxPointsPerOption: 4 },
+        userId
+      );
+
+      expect(updated.w_max).toBe(20);
+      expect(updated.max_points_per_option).toBe(4);
+    });
+
+    it('should allow a co_host to change votingMethod during optionen_sammeln', async () => {
+      const hostId = await createTestUser('host');
+      const coHostId = await createTestUser('cohost');
+      const survey = service.createSurvey(
+        { title: 'S', votingMethod: 'widerstand' },
+        hostId
+      );
+      service.addCoHost(survey.id, coHostId, hostId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      const updated = service.updateSurvey(
+        survey.id,
+        { votingMethod: 'mehrheit' },
+        coHostId
+      );
+
+      expect(updated.voting_method).toBe('mehrheit');
+    });
+
+    it('should reject title change during optionen_sammeln', async () => {
+      const userId = await createTestUser();
+      const survey = service.createSurvey(
+        { title: 'Locked', votingMethod: 'widerstand' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      expect(() =>
+        service.updateSurvey(survey.id, { title: 'Renamed' }, userId)
+      ).toThrow(ForbiddenError);
+    });
+
+    it('should reject description change during optionen_sammeln', async () => {
+      const userId = await createTestUser();
+      const survey = service.createSurvey(
+        { title: 'S', votingMethod: 'widerstand' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      expect(() =>
+        service.updateSurvey(
+          survey.id,
+          { description: 'new desc' },
+          userId
+        )
+      ).toThrow(ForbiddenError);
+    });
+
+    it('should reject allowAnonymous change during optionen_sammeln', async () => {
+      const userId = await createTestUser();
+      const survey = service.createSurvey(
+        { title: 'S', votingMethod: 'widerstand' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      expect(() =>
+        service.updateSurvey(survey.id, { allowAnonymous: false }, userId)
+      ).toThrow(ForbiddenError);
+    });
+
+    it('should reject voting method change once survey is in abstimmen phase', async () => {
+      const userId = await createTestUser();
+      const survey = service.createSurvey(
+        { title: 'S', votingMethod: 'widerstand' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      expect(() =>
+        service.updateSurvey(
+          survey.id,
+          { votingMethod: 'widerstand_punkte' },
+          userId
+        )
+      ).toThrow(ForbiddenError);
+    });
+
+    it('should leave untouched fields unchanged when only votingMethod is updated in optionen_sammeln', async () => {
+      const userId = await createTestUser();
+      const survey = service.createSurvey(
+        {
+          title: 'Keep It',
+          description: 'Keep desc',
+          votingMethod: 'widerstand',
+          allowAnonymous: false,
+        },
+        userId
+      );
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      const updated = service.updateSurvey(
+        survey.id,
+        { votingMethod: 'mehrheit' },
+        userId
+      );
+
+      expect(updated.voting_method).toBe('mehrheit');
+      expect(updated.title).toBe('Keep It');
+      expect(updated.description).toBe('Keep desc');
+      expect(updated.allow_anonymous).toBe(0);
+    });
   });
 
   // =========================================================================
