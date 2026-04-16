@@ -7,6 +7,7 @@ import { env } from './config/env';
 import { corsOptions } from './config/cors';
 import { getDatabase, closeDatabase } from './config/database';
 import { runInitialMigration } from './db/migrations/001_initial';
+import { runPositionMigration } from './db/migrations/002_add_position_to_options';
 import { setupSocketServer } from './socket/index';
 import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
@@ -35,6 +36,7 @@ app.use(generalLimiter);
 // Database initialization
 const database = getDatabase();
 runInitialMigration(database);
+runPositionMigration(database);
 console.log('Database initialized and migrations applied.');
 
 // Routes

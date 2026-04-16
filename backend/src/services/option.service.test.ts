@@ -704,4 +704,165 @@ describe('OptionService', () => {
       expect(resolved).toBe(anonResult.participant.id);
     });
   });
+
+  // =========================================================================
+  // moveOption (sort)
+  // =========================================================================
+
+  describe('moveOption', () => {
+    it('should assign incrementing positions on create', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      const a = service.createOption(survey.id, { title: 'A' }, participantId);
+      const b = service.createOption(survey.id, { title: 'B' }, participantId);
+      const c = service.createOption(survey.id, { title: 'C' }, participantId);
+
+      expect(a.position).toBe(0);
+      expect(b.position).toBe(1);
+      expect(c.position).toBe(2);
+    });
+
+    it('should return options ordered by position ASC', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      service.createOption(survey.id, { title: 'A' }, participantId);
+      const b = service.createOption(survey.id, { title: 'B' }, participantId);
+      service.createOption(survey.id, { title: 'C' }, participantId);
+
+      service.moveOption(b.id, 'up', userId);
+
+      const ordered = service.listOptionsForSurvey(survey.id);
+      expect(ordered.map((o) => o.title)).toEqual(['B', 'A', 'C']);
+    });
+
+    it('should swap positions when moving up', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      service.createOption(survey.id, { title: 'A' }, participantId);
+      const b = service.createOption(survey.id, { title: 'B' }, participantId);
+
+      service.moveOption(b.id, 'up', userId);
+
+      const updated = service.listOptionsForSurvey(survey.id);
+      expect(updated[0].title).toBe('B');
+      expect(updated[1].title).toBe('A');
+    });
+
+    it('should swap positions when moving down', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      const a = service.createOption(survey.id, { title: 'A' }, participantId);
+      service.createOption(survey.id, { title: 'B' }, participantId);
+
+      service.moveOption(a.id, 'down', userId);
+
+      const updated = service.listOptionsForSurvey(survey.id);
+      expect(updated[0].title).toBe('B');
+      expect(updated[1].title).toBe('A');
+    });
+
+    it('should reject moving the topmost option up', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      const a = service.createOption(survey.id, { title: 'A' }, participantId);
+      service.createOption(survey.id, { title: 'B' }, participantId);
+
+      expect(() => service.moveOption(a.id, 'up', userId)).toThrow(
+        'Option ist bereits ganz oben'
+      );
+    });
+
+    it('should reject moving the bottommost option down', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      service.createOption(survey.id, { title: 'A' }, participantId);
+      const b = service.createOption(survey.id, { title: 'B' }, participantId);
+
+      expect(() => service.moveOption(b.id, 'down', userId)).toThrow(
+        'Option ist bereits ganz unten'
+      );
+    });
+
+    it('should allow a co-host to reorder options', async () => {
+      const hostId = await createTestUser('host');
+      const coHostId = await createTestUser('cohost');
+      const survey = createTestSurvey(hostId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      surveyService.addCoHost(survey.id, coHostId, hostId);
+      const hostParticipantId = getParticipantId(survey.id, hostId);
+
+      service.createOption(survey.id, { title: 'A' }, hostParticipantId);
+      const b = service.createOption(survey.id, { title: 'B' }, hostParticipantId);
+
+      service.moveOption(b.id, 'up', coHostId);
+
+      const updated = service.listOptionsForSurvey(survey.id);
+      expect(updated[0].title).toBe('B');
+    });
+
+    it('should forbid regular participants from reordering options', async () => {
+      const hostId = await createTestUser('host');
+      const memberId = await createTestUser('member');
+      const survey = createTestSurvey(hostId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      // Add member as regular participant
+      surveyService.joinSurveyByInviteCode(
+        survey.invite_code,
+        memberId,
+        null,
+        null
+      );
+
+      const hostParticipantId = getParticipantId(survey.id, hostId);
+      service.createOption(survey.id, { title: 'A' }, hostParticipantId);
+      const b = service.createOption(survey.id, { title: 'B' }, hostParticipantId);
+
+      expect(() => service.moveOption(b.id, 'up', memberId)).toThrow(
+        ForbiddenError
+      );
+    });
+
+    it('should reject reordering outside optionen_sammeln phase', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId);
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      service.createOption(survey.id, { title: 'A' }, participantId);
+      const b = service.createOption(survey.id, { title: 'B' }, participantId);
+
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      expect(() => service.moveOption(b.id, 'up', userId)).toThrow(
+        ForbiddenError
+      );
+    });
+
+    it('should throw NotFoundError for unknown optionId', async () => {
+      const userId = await createTestUser();
+      expect(() => service.moveOption('nonexistent-id', 'up', userId)).toThrow(
+        NotFoundError
+      );
+    });
+  });
 });

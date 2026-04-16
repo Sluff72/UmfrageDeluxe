@@ -113,6 +113,9 @@ export default function SurveyDetailPage() {
       setOptionsRevision((r) => r + 1);
       refreshTransitionInfo();
     },
+    onOptionsReordered: () => {
+      setOptionsRevision((r) => r + 1);
+    },
     onVoteReceived: () => {
       setVotesRevision((r) => r + 1);
       refreshTransitionInfo();

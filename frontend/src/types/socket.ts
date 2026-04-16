@@ -16,6 +16,7 @@ export const SOCKET_EVENTS = {
   OPTION_ADDED: "option:added",
   OPTION_UPDATED: "option:updated",
   OPTION_REMOVED: "option:removed",
+  OPTION_REORDERED: "option:reordered",
 
   VOTE_RECEIVED: "vote:received",
   VOTE_RESULTS_UPDATED: "vote:results-updated",
@@ -54,6 +55,11 @@ export interface OptionUpdatedPayload {
 export interface OptionRemovedPayload {
   surveyId: string;
   optionId: string;
+}
+
+export interface OptionReorderedPayload {
+  surveyId: string;
+  options: SurveyOption[];
 }
 
 export interface VoteReceivedPayload {

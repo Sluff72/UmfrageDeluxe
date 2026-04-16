@@ -2,7 +2,11 @@ import { Request, Response, NextFunction } from 'express';
 import { optionService } from '../services/option.service';
 import { getSocketServer } from '../socket/index';
 import { SOCKET_EVENTS, buildSurveyRoomName } from '../socket/events';
-import type { CreateOptionSchemaInput, UpdateOptionSchemaInput } from '../validators/option.schema';
+import type {
+  CreateOptionSchemaInput,
+  UpdateOptionSchemaInput,
+  MoveOptionSchemaInput,
+} from '../validators/option.schema';
 
 export class OptionController {
   async createOption(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -64,6 +68,37 @@ export class OptionController {
       }
 
       res.json({ option });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async moveOption(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const optionId = req.params.optionId as string;
+      const { direction } = req.body as MoveOptionSchemaInput;
+      const userId = req.user?.sub ?? null;
+
+      const existingOption = optionService.getOptionById(optionId);
+      const surveyId = existingOption.survey_id;
+
+      // Ensures the caller is a participant of the survey before touching data.
+      optionService.resolveParticipantId(surveyId, userId, req.participant);
+
+      const options = optionService.moveOption(optionId, direction, userId);
+
+      // Broadcast via Socket.IO
+      try {
+        const io = getSocketServer();
+        io.to(buildSurveyRoomName(surveyId)).emit(SOCKET_EVENTS.OPTION_REORDERED, {
+          surveyId,
+          options,
+        });
+      } catch {
+        // Socket.IO not initialized – skip
+      }
+
+      res.json({ options });
     } catch (error) {
       next(error);
     }
