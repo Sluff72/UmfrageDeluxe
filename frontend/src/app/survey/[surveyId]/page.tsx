@@ -249,17 +249,21 @@ export default function SurveyDetailPage() {
               </div>
             )}
 
-            {/* Options list – visible from optionen_sammeln onward */}
-            {survey.status !== "entwurf" && (
-              <OptionsList
-                surveyId={surveyId}
-                surveyStatus={survey.status}
-                currentParticipantId={currentUserParticipant?.id ?? null}
-                canManage={canManage}
-                onOptionsChange={refreshTransitionInfo}
-                revision={optionsRevision}
-              />
-            )}
+            {/* Options list – visible from optionen_sammeln onward.
+                Hidden for participants during abstimmen: option titles/descriptions
+                are already shown above each slider in the VotingPanel.
+                Host/Co-Host still see the list in parallel for oversight. */}
+            {survey.status !== "entwurf" &&
+              (survey.status !== "abstimmen" || canManage) && (
+                <OptionsList
+                  surveyId={surveyId}
+                  surveyStatus={survey.status}
+                  currentParticipantId={currentUserParticipant?.id ?? null}
+                  canManage={canManage}
+                  onOptionsChange={refreshTransitionInfo}
+                  revision={optionsRevision}
+                />
+              )}
 
             {/* Voting panel – visible during abstimmen */}
             {survey.status === "abstimmen" && (
