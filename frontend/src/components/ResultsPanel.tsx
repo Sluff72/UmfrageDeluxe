@@ -14,6 +14,7 @@ import { api } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { ResultsPanelSkeleton } from "@/components/Skeleton";
 import type { VotingMethod, SurveyStatus, ObjectionStatus } from "@/types/survey";
+import type { FreetextOptionResults } from "@/types/freetext";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -62,7 +63,19 @@ const OBJECTION_STATUS_COLORS: Record<ObjectionStatus, string> = {
 
 /* ── Main Component ────────────────────────────────────────────── */
 
-export default function ResultsPanel({
+export default function ResultsPanel(props: ResultsPanelProps) {
+  if (props.votingMethod === "freitext") {
+    return (
+      <FreetextResultsPanel
+        surveyId={props.surveyId}
+        revision={props.revision}
+      />
+    );
+  }
+  return <NumericResultsPanel {...props} />;
+}
+
+function NumericResultsPanel({
   surveyId,
   votingMethod,
   surveyStatus,
@@ -643,4 +656,130 @@ function getResistanceTextColor(value: number): string {
   if (value <= 3) return "text-emerald-600 dark:text-emerald-400";
   if (value <= 6) return "text-amber-600 dark:text-amber-400";
   return "text-red-600 dark:text-red-400";
+}
+
+/* ── Freetext Results Panel ────────────────────────────────────── */
+
+function FreetextResultsPanel({
+  surveyId,
+  revision = 0,
+}: {
+  surveyId: string;
+  revision?: number;
+}) {
+  const [results, setResults] = useState<FreetextOptionResults[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchResults = useCallback(async () => {
+    try {
+      const data = await api.get<{ results: FreetextOptionResults[] }>(
+        `/api/surveys/${surveyId}/answers`
+      );
+      setResults(data.results);
+    } catch {
+      setError("Antworten konnten nicht geladen werden");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [surveyId]);
+
+  useEffect(() => {
+    fetchResults();
+  }, [fetchResults, revision]);
+
+  if (isLoading) {
+    return <ResultsPanelSkeleton />;
+  }
+
+  const totalAnswers = results
+    .flatMap((o) => o.questions.flatMap((q) => q.answers))
+    .length;
+
+  if (totalAnswers === 0 && !error) {
+    return (
+      <div className="rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
+        <EmptyState
+          icon="✍️"
+          title="Noch keine Antworten"
+          description="Sobald Teilnehmer Antworten einreichen, erscheinen sie hier."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Antworten · {totalAnswers}
+        </h2>
+      </div>
+
+      {error && (
+        <p className="mb-4 text-sm text-red-500 dark:text-red-400">{error}</p>
+      )}
+
+      <div className="space-y-6">
+        {results.map((option) => (
+          <div
+            key={option.option_id}
+            className="rounded-lg border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800"
+          >
+            <p className="font-medium text-zinc-900 dark:text-zinc-100">
+              {option.option_title}
+            </p>
+            {option.option_description && (
+              <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+                {option.option_description}
+              </p>
+            )}
+
+            {option.questions.length === 0 ? (
+              <p className="mt-3 text-xs italic text-zinc-400 dark:text-zinc-500">
+                Keine Fragen für diese Option.
+              </p>
+            ) : (
+              <div className="mt-4 space-y-4">
+                {option.questions.map((q) => (
+                  <div key={q.question_id}>
+                    <p className="mb-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      {q.question_text}
+                      <span className="ml-2 text-xs font-normal text-zinc-400">
+                        · {q.answers.length}{" "}
+                        {q.answers.length === 1 ? "Antwort" : "Antworten"}
+                      </span>
+                    </p>
+                    {q.answers.length === 0 ? (
+                      <p className="text-xs italic text-zinc-400 dark:text-zinc-500">
+                        Noch keine Antworten.
+                      </p>
+                    ) : (
+                      <ul className="space-y-2 border-l-2 border-blue-200 pl-3 dark:border-blue-800">
+                        {q.answers.map((a) => (
+                          <li
+                            key={a.id}
+                            className="rounded-md border border-zinc-100 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900"
+                          >
+                            <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-100">
+                              {a.text}
+                            </p>
+                            {a.author_name && (
+                              <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+                                — {a.author_name}
+                              </p>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }

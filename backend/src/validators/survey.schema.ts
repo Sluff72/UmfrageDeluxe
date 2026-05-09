@@ -9,7 +9,7 @@ export const createSurveySchema = z.object({
     .string()
     .max(2000, 'Description must be at most 2000 characters')
     .optional(),
-  votingMethod: z.enum(['widerstand_punkte', 'widerstand', 'mehrheit'], {
+  votingMethod: z.enum(['widerstand_punkte', 'widerstand', 'mehrheit', 'freitext'], {
     errorMap: () => ({ message: 'Invalid voting method' }),
   }),
   wMax: z
@@ -24,6 +24,7 @@ export const createSurveySchema = z.object({
     .max(10, 'Max points per option must be at most 10')
     .optional(),
   allowAnonymous: z.boolean().optional(),
+  showAnswerAuthors: z.boolean().optional(),
 });
 
 export const updateSurveySchema = z.object({
@@ -37,7 +38,7 @@ export const updateSurveySchema = z.object({
     .max(2000, 'Description must be at most 2000 characters')
     .optional(),
   votingMethod: z
-    .enum(['widerstand_punkte', 'widerstand', 'mehrheit'])
+    .enum(['widerstand_punkte', 'widerstand', 'mehrheit', 'freitext'])
     .optional(),
   wMax: z
     .number()
@@ -51,6 +52,7 @@ export const updateSurveySchema = z.object({
     .max(10)
     .optional(),
   allowAnonymous: z.boolean().optional(),
+  showAnswerAuthors: z.boolean().optional(),
 });
 
 export const updateParticipantRoleSchema = z.object({

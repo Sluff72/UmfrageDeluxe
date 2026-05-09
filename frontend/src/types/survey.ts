@@ -8,7 +8,8 @@ export type SurveyStatus =
 export type VotingMethod =
   | "widerstand_punkte"
   | "widerstand"
-  | "mehrheit";
+  | "mehrheit"
+  | "freitext";
 
 export type SurveyRole = "host" | "co_host" | "teilnehmer";
 
@@ -20,6 +21,7 @@ export interface Survey {
   voting_method: VotingMethod;
   w_max: number | null;
   max_points_per_option: number | null;
+  show_answer_authors: number;
   invite_code: string;
   allow_anonymous: number;
   is_archived: number;
@@ -101,6 +103,7 @@ export const VOTING_METHOD_LABELS: Record<VotingMethod, string> = {
   widerstand_punkte: "Widerstandsabfrage mit Punkteregel",
   widerstand: "Widerstandsabfrage",
   mehrheit: "Mehrheitsentscheid",
+  freitext: "Freitext-Befragung",
 };
 
 export const SURVEY_STATUS_COLORS: Record<SurveyStatus, string> = {

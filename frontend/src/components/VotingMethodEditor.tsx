@@ -18,6 +18,8 @@ const VOTING_METHOD_DESCRIPTIONS: Record<VotingMethod, string> = {
   widerstand:
     "Teilnehmer bewerten ihren Widerstand (0–10) pro Option ohne Limit.",
   mehrheit: "Einfach Zustimmen oder Ablehnen pro Option.",
+  freitext:
+    "Teilnehmer beantworten zu jeder Option freie Fragen mit eigenen Worten.",
 };
 
 export default function VotingMethodEditor({
@@ -36,6 +38,9 @@ export default function VotingMethodEditor({
       ? String(survey.max_points_per_option)
       : ""
   );
+  const [showAnswerAuthors, setShowAnswerAuthors] = useState<boolean>(
+    survey.show_answer_authors === 1
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,6 +54,7 @@ export default function VotingMethodEditor({
           ? String(survey.max_points_per_option)
           : ""
       );
+      setShowAnswerAuthors(survey.show_answer_authors === 1);
       setError(null);
     }
   }, [open, survey]);
@@ -76,6 +82,10 @@ export default function VotingMethodEditor({
     setIsSaving(true);
 
     const body: Record<string, unknown> = { votingMethod: method };
+
+    if (method === "freitext") {
+      body.showAnswerAuthors = showAnswerAuthors;
+    }
 
     if (method === "widerstand_punkte") {
       if (maxPoints !== "") {
@@ -165,6 +175,28 @@ export default function VotingMethodEditor({
             </label>
           ))}
         </div>
+
+        {method === "freitext" && (
+          <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/60">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={showAnswerAuthors}
+                onChange={(e) => setShowAnswerAuthors(e.target.checked)}
+                className="mt-0.5 accent-zinc-900 dark:accent-zinc-300"
+              />
+              <div>
+                <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  Antworten mit Autor-Name anzeigen
+                </span>
+                <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                  Wenn deaktiviert, werden Antworten anonym dargestellt – auch
+                  für Host und Co-Host.
+                </p>
+              </div>
+            </label>
+          </div>
+        )}
 
         {method === "widerstand_punkte" && (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">

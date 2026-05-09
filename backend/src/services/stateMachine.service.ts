@@ -15,6 +15,25 @@ const VALID_TRANSITIONS: Record<SurveyStatus, SurveyStatus[]> = {
   beendet: [],
 };
 
+// Freitext skips the einwand_integration phase entirely — there's nothing
+// to "object to" in a free-text answer, so the host concludes the survey
+// directly after the answer phase.
+const FREITEXT_TRANSITIONS: Record<SurveyStatus, SurveyStatus[]> = {
+  entwurf: ['optionen_sammeln'],
+  optionen_sammeln: ['abstimmen'],
+  abstimmen: ['beendet'],
+  einwand_integration: [],
+  beendet: [],
+};
+
+function getValidTargets(survey: Survey): SurveyStatus[] {
+  const map =
+    survey.voting_method === 'freitext'
+      ? FREITEXT_TRANSITIONS
+      : VALID_TRANSITIONS;
+  return map[survey.status] ?? [];
+}
+
 // ---------------------------------------------------------------------------
 // Guard result
 // ---------------------------------------------------------------------------
@@ -35,7 +54,7 @@ export class StateMachineService {
    */
   getAvailableTransitions(surveyId: string): SurveyStatus[] {
     const survey = surveyService.getSurveyById(surveyId);
-    return VALID_TRANSITIONS[survey.status] ?? [];
+    return getValidTargets(survey);
   }
 
   /**
@@ -59,6 +78,32 @@ export class StateMachineService {
       const optionCount = database
         .prepare('SELECT COUNT(*) as count FROM options WHERE survey_id = ?')
         .get(survey.id) as { count: number };
+
+      if (survey.voting_method === 'freitext') {
+        // Freitext-Umfragen sind auch mit nur einer Option sinnvoll
+        // (eine Option mit mehreren Fragen darunter), benötigen aber
+        // mindestens eine Frage, damit Teilnehmer etwas zum Beantworten haben.
+        if (optionCount.count < 1) {
+          return { allowed: false, reason: 'Mindestens 1 Option ist erforderlich' };
+        }
+
+        const questionCount = database
+          .prepare(
+            `SELECT COUNT(*) as count
+             FROM freetext_questions q
+             INNER JOIN options o ON o.id = q.option_id
+             WHERE o.survey_id = ?`
+          )
+          .get(survey.id) as { count: number };
+
+        if (questionCount.count < 1) {
+          return {
+            allowed: false,
+            reason: 'Mindestens eine Frage muss definiert sein',
+          };
+        }
+        return { allowed: true };
+      }
 
       if (optionCount.count < 2) {
         return { allowed: false, reason: 'Mindestens 2 Optionen sind erforderlich' };
@@ -135,7 +180,7 @@ export class StateMachineService {
     this.assertHostOrCoHost(surveyId, userId);
 
     // Structural validation
-    const validTargets = VALID_TRANSITIONS[survey.status];
+    const validTargets = getValidTargets(survey);
     if (!validTargets.includes(targetStatus)) {
       throw new ValidationError(
         `Übergang von "${survey.status}" nach "${targetStatus}" ist nicht erlaubt`
@@ -224,7 +269,7 @@ export class StateMachineService {
     votingRound: number;
   } {
     const survey = surveyService.getSurveyById(surveyId);
-    const validTargets = VALID_TRANSITIONS[survey.status] ?? [];
+    const validTargets = getValidTargets(survey);
 
     const availableTransitions = validTargets.map((targetStatus) => {
       const guard = this.checkGuard(survey, targetStatus);

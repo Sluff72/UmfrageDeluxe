@@ -15,6 +15,8 @@ const VOTING_METHOD_DESCRIPTIONS: Record<VotingMethod, string> = {
   widerstand:
     "Teilnehmer bewerten ihren Widerstand (0–10) pro Option ohne Limit.",
   mehrheit: "Einfach Zustimmen oder Ablehnen pro Option.",
+  freitext:
+    "Teilnehmer beantworten zu jeder Option freie Fragen mit eigenen Worten.",
 };
 
 export default function NewSurveyPage() {
@@ -23,6 +25,7 @@ export default function NewSurveyPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [votingMethod, setVotingMethod] = useState<VotingMethod>("widerstand");
+  const [showAnswerAuthors, setShowAnswerAuthors] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,6 +45,10 @@ export default function NewSurveyPage() {
         description: description || undefined,
         votingMethod,
       };
+
+      if (votingMethod === "freitext") {
+        body.showAnswerAuthors = showAnswerAuthors;
+      }
 
       const data = await api.post<{ survey: Survey }>("/api/surveys", body);
       router.push(`/survey/${data.survey.id}`);
@@ -144,6 +151,28 @@ export default function NewSurveyPage() {
                 ))}
               </div>
             </div>
+
+            {votingMethod === "freitext" && (
+              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800/60">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={showAnswerAuthors}
+                    onChange={(e) => setShowAnswerAuthors(e.target.checked)}
+                    className="mt-0.5 accent-zinc-900 dark:accent-zinc-300"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      Antworten mit Autor-Name anzeigen
+                    </span>
+                    <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                      Wenn deaktiviert, werden Freitext-Antworten anonym
+                      dargestellt – auch für Host und Co-Host.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            )}
 
             {error && (
               <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">

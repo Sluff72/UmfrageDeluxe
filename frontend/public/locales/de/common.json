@@ -20,7 +20,8 @@
     "voting_method": {
       "widerstand_punkte": "Widerstandsabfrage mit Punkteregel",
       "widerstand": "Widerstandsabfrage",
-      "mehrheit": "Mehrheitsentscheid"
+      "mehrheit": "Mehrheitsentscheid",
+      "freitext": "Freitext-Befragung"
     },
     "roles": {
       "host": "Host",

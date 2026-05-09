@@ -17,6 +17,9 @@ export const SOCKET_EVENTS = {
   VOTE_RECEIVED: 'vote:received',
   VOTE_RESULTS_UPDATED: 'vote:results-updated',
 
+  FREETEXT_QUESTIONS_UPDATED: 'freetext:questions-updated',
+  FREETEXT_ANSWER_RECEIVED: 'freetext:answer-received',
+
   OBJECTION_ADDED: 'objection:added',
   OBJECTION_STATUS_CHANGED: 'objection:status-changed',
 

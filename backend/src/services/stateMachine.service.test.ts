@@ -832,4 +832,81 @@ describe('StateMachineService', () => {
       expect(round).toBe(3);
     });
   });
+
+  // =========================================================================
+  // Freitext-specific transitions
+  // =========================================================================
+
+  describe('Freitext voting method', () => {
+    function addFreitextQuestion(optionId: string, text = 'Q'): string {
+      const db = getDatabase();
+      const row = db
+        .prepare(
+          `INSERT INTO freetext_questions (option_id, text, position)
+           VALUES (?, ?, 0)
+           RETURNING id`
+        )
+        .get(optionId, text) as { id: string };
+      return row.id;
+    }
+
+    it("offers 'beendet' (and not 'einwand_integration') from 'abstimmen' for freitext surveys", async () => {
+      const userId = await createTestUser();
+      const survey = surveyService.createSurvey(
+        { title: 'Freitext', votingMethod: 'freitext' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      const transitions = smService.getAvailableTransitions(survey.id);
+
+      expect(transitions).toEqual(['beendet']);
+      expect(transitions).not.toContain('einwand_integration');
+    });
+
+    it('allows optionen_sammeln -> abstimmen with a single option as long as a question exists', async () => {
+      const userId = await createTestUser();
+      const survey = surveyService.createSurvey(
+        { title: 'Freitext one option', votingMethod: 'freitext' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const optionId = addTestOption(survey.id, 'Option A');
+      addFreitextQuestion(optionId);
+
+      const fresh = surveyService.getSurveyById(survey.id);
+      const result = smService.checkGuard(fresh, 'abstimmen');
+
+      expect(result.allowed).toBe(true);
+    });
+
+    it('blocks optionen_sammeln -> abstimmen when no question is defined', async () => {
+      const userId = await createTestUser();
+      const survey = surveyService.createSurvey(
+        { title: 'Freitext no question', votingMethod: 'freitext' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      addTestOption(survey.id, 'Option A');
+
+      const fresh = surveyService.getSurveyById(survey.id);
+      const result = smService.checkGuard(fresh, 'abstimmen');
+
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toContain('Frage');
+    });
+
+    it('rejects abstimmen -> einwand_integration on freitext surveys', async () => {
+      const userId = await createTestUser();
+      const survey = surveyService.createSurvey(
+        { title: 'Freitext', votingMethod: 'freitext' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      expect(() =>
+        smService.transitionSurvey(survey.id, 'einwand_integration', userId)
+      ).toThrow(ValidationError);
+    });
+  });
 });

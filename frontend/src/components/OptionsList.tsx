@@ -6,7 +6,8 @@ import { useToast } from "@/components/Toast";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import EmptyState from "@/components/EmptyState";
 import { OptionsListSkeleton } from "@/components/Skeleton";
-import type { SurveyOption, SurveyStatus } from "@/types/survey";
+import type { SurveyOption, SurveyStatus, VotingMethod } from "@/types/survey";
+import type { FreetextQuestion } from "@/types/freetext";
 
 interface OptionExportEntry {
   title: string;
@@ -67,6 +68,7 @@ function parseImportedOptions(raw: unknown): OptionExportEntry[] {
 interface OptionsListProps {
   surveyId: string;
   surveyStatus: SurveyStatus;
+  votingMethod: VotingMethod;
   currentParticipantId: string | null;
   canManage: boolean;
   onOptionsChange?: () => void;
@@ -77,12 +79,14 @@ interface OptionsListProps {
 export default function OptionsList({
   surveyId,
   surveyStatus,
+  votingMethod,
   currentParticipantId,
   canManage,
   onOptionsChange,
   revision = 0,
 }: OptionsListProps) {
   const [options, setOptions] = useState<SurveyOption[]>([]);
+  const [questions, setQuestions] = useState<FreetextQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -96,8 +100,13 @@ export default function OptionsList({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const toast = useToast();
 
+  const isFreitext = votingMethod === "freitext";
   const canAddOptions = surveyStatus === "optionen_sammeln";
   const canEditOptions = surveyStatus === "optionen_sammeln";
+  const canEditQuestions =
+    isFreitext &&
+    canManage &&
+    (surveyStatus === "entwurf" || surveyStatus === "optionen_sammeln");
 
   const fetchOptions = useCallback(async () => {
     try {
@@ -112,9 +121,28 @@ export default function OptionsList({
     }
   }, [surveyId]);
 
+  const fetchQuestions = useCallback(async () => {
+    if (!isFreitext) {
+      setQuestions([]);
+      return;
+    }
+    try {
+      const data = await api.get<{ questions: FreetextQuestion[] }>(
+        `/api/surveys/${surveyId}/questions`
+      );
+      setQuestions(data.questions);
+    } catch {
+      // Non-fatal; the questions section just shows nothing
+    }
+  }, [surveyId, isFreitext]);
+
   useEffect(() => {
     fetchOptions();
   }, [fetchOptions, revision]);
+
+  useEffect(() => {
+    fetchQuestions();
+  }, [fetchQuestions, revision]);
 
   async function handleAddOption(e: React.FormEvent) {
     e.preventDefault();
@@ -428,6 +456,21 @@ export default function OptionsList({
                   )}
                 </div>
               )}
+
+              {isFreitext && (
+                <FreetextQuestionsSection
+                  surveyId={surveyId}
+                  optionId={option.id}
+                  questions={questions.filter(
+                    (q) => q.option_id === option.id
+                  )}
+                  canEdit={canEditQuestions}
+                  onChanged={() => {
+                    fetchQuestions();
+                    onOptionsChange?.();
+                  }}
+                />
+              )}
             </div>
           ))}
         </div>
@@ -443,6 +486,14 @@ export default function OptionsList({
         onConfirm={() => deleteTarget && handleDeleteOption(deleteTarget)}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      {/* Hint when freitext + no questions yet */}
+      {isFreitext && options.length > 0 && questions.length === 0 && (
+        <p className="-mt-1 mb-4 text-xs text-amber-600 dark:text-amber-400">
+          Damit die Umfrage in die Phase &quot;Abstimmen&quot; wechseln kann,
+          muss mindestens eine Frage definiert sein.
+        </p>
+      )}
 
       {/* Add option form */}
       {canAddOptions && (
@@ -471,6 +522,210 @@ export default function OptionsList({
             </button>
           </div>
         </form>
+      )}
+    </div>
+  );
+}
+
+/* ── Freetext Questions per Option ───────────────────────────────── */
+
+function FreetextQuestionsSection({
+  surveyId,
+  optionId,
+  questions,
+  canEdit,
+  onChanged,
+}: {
+  surveyId: string;
+  optionId: string;
+  questions: FreetextQuestion[];
+  canEdit: boolean;
+  onChanged: () => void;
+}) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newText, setNewText] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    const trimmed = newText.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post(
+        `/api/surveys/${surveyId}/options/${optionId}/questions`,
+        { text: trimmed }
+      );
+      setNewText("");
+      setIsAdding(false);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Frage nicht gespeichert");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleUpdate(questionId: string) {
+    const trimmed = editText.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.put(`/api/surveys/${surveyId}/questions/${questionId}`, {
+        text: trimmed,
+      });
+      setEditingId(null);
+      setEditText("");
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Frage nicht aktualisiert");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(questionId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.delete(`/api/surveys/${surveyId}/questions/${questionId}`);
+      toast.success("Frage gelöscht");
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Frage nicht gelöscht");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (questions.length === 0 && !canEdit) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-700">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+        Fragen ({questions.length})
+      </p>
+
+      {error && (
+        <p className="mb-2 text-xs text-red-500 dark:text-red-400">{error}</p>
+      )}
+
+      <ul className="space-y-2">
+        {questions.map((q) => (
+          <li
+            key={q.id}
+            className="rounded-md border border-zinc-100 bg-white p-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+          >
+            {editingId === q.id ? (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  maxLength={500}
+                  className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleUpdate(q.id)}
+                    disabled={busy || !editText.trim()}
+                    className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Speichern
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingId(null);
+                      setEditText("");
+                    }}
+                    className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start justify-between gap-2">
+                <p className="flex-1 text-zinc-800 dark:text-zinc-200">
+                  {q.text}
+                </p>
+                {canEdit && (
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingId(q.id);
+                        setEditText(q.text);
+                      }}
+                      className="rounded px-2 py-0.5 text-xs text-zinc-500 hover:bg-zinc-200 hover:text-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                    >
+                      Bearbeiten
+                    </button>
+                    <button
+                      onClick={() => handleDelete(q.id)}
+                      disabled={busy}
+                      className="rounded px-2 py-0.5 text-xs text-red-500 hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                    >
+                      Löschen
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {canEdit && (
+        <div className="mt-2">
+          {isAdding ? (
+            <form onSubmit={handleAdd} className="space-y-2">
+              <input
+                type="text"
+                value={newText}
+                onChange={(e) => setNewText(e.target.value)}
+                placeholder="Neue Frage..."
+                maxLength={500}
+                autoFocus
+                className="w-full rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={busy || !newText.trim()}
+                  className="rounded-md bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                >
+                  Hinzufügen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdding(false);
+                    setNewText("");
+                  }}
+                  className="rounded-md border border-zinc-300 px-3 py-1 text-xs text-zinc-600 hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsAdding(true)}
+              className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              + Frage hinzufügen
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

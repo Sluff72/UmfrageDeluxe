@@ -950,4 +950,23 @@ describe('VoteService', () => {
       expect(service.hasVoted(survey.id, participantId)).toBe(false);
     });
   });
+
+  describe('freitext rejection', () => {
+    it('rejects numeric votes on freitext surveys', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId, 'freitext');
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+      const option = addTestOption(survey.id, participantId, 'O');
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      expect(() =>
+        service.submitVotes(
+          survey.id,
+          [{ optionId: option.id, value: 1 }],
+          participantId
+        )
+      ).toThrow(ValidationError);
+    });
+  });
 });

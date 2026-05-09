@@ -28,8 +28,8 @@ export class SurveyService {
 
     const survey = database
       .prepare(
-        `INSERT INTO surveys (title, description, voting_method, w_max, max_points_per_option, invite_code, allow_anonymous, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO surveys (title, description, voting_method, w_max, max_points_per_option, show_answer_authors, invite_code, allow_anonymous, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING *`
       )
       .get(
@@ -38,6 +38,7 @@ export class SurveyService {
         input.votingMethod,
         input.wMax ?? null,
         input.maxPointsPerOption ?? 5,
+        input.showAnswerAuthors !== false ? 1 : 0,
         inviteCode,
         input.allowAnonymous !== false ? 1 : 0,
         userId
@@ -133,6 +134,7 @@ export class SurveyService {
            w_max = COALESCE(?, w_max),
            max_points_per_option = COALESCE(?, max_points_per_option),
            allow_anonymous = COALESCE(?, allow_anonymous),
+           show_answer_authors = COALESCE(?, show_answer_authors),
            updated_at = datetime('now')
          WHERE id = ?
          RETURNING *`
@@ -144,6 +146,11 @@ export class SurveyService {
         input.wMax ?? null,
         input.maxPointsPerOption ?? null,
         input.allowAnonymous !== undefined ? (input.allowAnonymous ? 1 : 0) : null,
+        input.showAnswerAuthors !== undefined
+          ? input.showAnswerAuthors
+            ? 1
+            : 0
+          : null,
         surveyId
       ) as Survey;
 
@@ -181,10 +188,10 @@ export class SurveyService {
         .prepare(
           `INSERT INTO surveys (
               title, description, status, voting_method,
-              w_max, max_points_per_option,
+              w_max, max_points_per_option, show_answer_authors,
               invite_code, allow_anonymous, created_by
             )
-            VALUES (?, ?, 'optionen_sammeln', ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 'optionen_sammeln', ?, ?, ?, ?, ?, ?, ?)
             RETURNING *`
         )
         .get(
@@ -193,6 +200,7 @@ export class SurveyService {
           original.voting_method,
           original.w_max,
           original.max_points_per_option,
+          original.show_answer_authors,
           newInviteCode,
           original.allow_anonymous,
           userId

@@ -8,7 +8,8 @@ export type SurveyStatus =
 export type VotingMethod =
   | 'widerstand_punkte'
   | 'widerstand'
-  | 'mehrheit';
+  | 'mehrheit'
+  | 'freitext';
 
 export interface Survey {
   id: string;
@@ -18,6 +19,7 @@ export interface Survey {
   voting_method: VotingMethod;
   w_max: number | null;
   max_points_per_option: number | null;
+  show_answer_authors: number; // SQLite boolean — only meaningful for 'freitext'
   invite_code: string;
   allow_anonymous: number; // SQLite boolean
   is_archived: number;     // SQLite boolean
@@ -38,6 +40,7 @@ export interface CreateSurveyInput {
   wMax?: number;
   maxPointsPerOption?: number;
   allowAnonymous?: boolean;
+  showAnswerAuthors?: boolean;
 }
 
 export interface UpdateSurveyInput {
@@ -47,4 +50,5 @@ export interface UpdateSurveyInput {
   wMax?: number;
   maxPointsPerOption?: number;
   allowAnonymous?: boolean;
+  showAnswerAuthors?: boolean;
 }

@@ -284,6 +284,7 @@ export default function SurveyDetailPage() {
                 <OptionsList
                   surveyId={surveyId}
                   surveyStatus={survey.status}
+                  votingMethod={survey.voting_method}
                   currentParticipantId={currentUserParticipant?.id ?? null}
                   canManage={canManage}
                   onOptionsChange={refreshTransitionInfo}

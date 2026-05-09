@@ -8,6 +8,7 @@ import { corsOptions } from './config/cors';
 import { getDatabase, closeDatabase } from './config/database';
 import { runInitialMigration } from './db/migrations/001_initial';
 import { runPositionMigration } from './db/migrations/002_add_position_to_options';
+import { runFreitextMigration } from './db/migrations/003_add_freitext_support';
 import { setupSocketServer } from './socket/index';
 import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
@@ -15,6 +16,7 @@ import { surveyRouter } from './routes/survey.routes';
 import { optionRouter } from './routes/option.routes';
 import { voteRouter } from './routes/vote.routes';
 import { objectionRouter } from './routes/objection.routes';
+import { freetextRouter } from './routes/freetext.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 
@@ -37,6 +39,7 @@ app.use(generalLimiter);
 const database = getDatabase();
 runInitialMigration(database);
 runPositionMigration(database);
+runFreitextMigration(database);
 console.log('Database initialized and migrations applied.');
 
 // Routes
@@ -46,6 +49,7 @@ app.use('/api', surveyRouter);
 app.use('/api', optionRouter);
 app.use('/api', voteRouter);
 app.use('/api', objectionRouter);
+app.use('/api', freetextRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

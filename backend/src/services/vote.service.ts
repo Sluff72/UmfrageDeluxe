@@ -224,6 +224,10 @@ export class VoteService {
       case 'mehrheit':
         this.validateMehrheit(votes);
         break;
+      case 'freitext':
+        throw new ValidationError(
+          'Freitext-Antworten werden über /answers eingereicht, nicht über /votes'
+        );
     }
   }
 

@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 import { VotingPanelSkeleton } from "@/components/Skeleton";
 import type { SurveyOption, VotingMethod } from "@/types/survey";
+import type { FreetextAnswer, FreetextQuestion } from "@/types/freetext";
 
 interface VoteEntry {
   optionId: string;
@@ -26,6 +27,33 @@ interface VotingPanelProps {
 }
 
 export default function VotingPanel({
+  surveyId,
+  votingMethod,
+  wMax,
+  maxPointsPerOption,
+  onVoteSubmit,
+}: VotingPanelProps) {
+  if (votingMethod === "freitext") {
+    return (
+      <FreetextVotingPanel
+        surveyId={surveyId}
+        onAnswerSubmit={onVoteSubmit}
+      />
+    );
+  }
+
+  return (
+    <NumericVotingPanel
+      surveyId={surveyId}
+      votingMethod={votingMethod}
+      wMax={wMax}
+      maxPointsPerOption={maxPointsPerOption}
+      onVoteSubmit={onVoteSubmit}
+    />
+  );
+}
+
+function NumericVotingPanel({
   surveyId,
   votingMethod,
   wMax,
@@ -389,6 +417,206 @@ function PointBudget({
           Budget um {Math.abs(remaining)} Punkte überschritten!
         </p>
       )}
+    </div>
+  );
+}
+
+/* ── Freetext Voting Panel ─────────────────────────────────────── */
+
+const ANSWER_TEXT_MAX = 2000;
+
+interface FreetextVotingPanelProps {
+  surveyId: string;
+  onAnswerSubmit?: () => void;
+}
+
+function FreetextVotingPanel({
+  surveyId,
+  onAnswerSubmit,
+}: FreetextVotingPanelProps) {
+  const [options, setOptions] = useState<SurveyOption[]>([]);
+  const [questions, setQuestions] = useState<FreetextQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [optionsData, questionsData, mineData] = await Promise.all([
+        api.get<{ options: SurveyOption[] }>(
+          `/api/surveys/${surveyId}/options`
+        ),
+        api.get<{ questions: FreetextQuestion[] }>(
+          `/api/surveys/${surveyId}/questions`
+        ),
+        api
+          .get<{ answers: FreetextAnswer[] }>(
+            `/api/surveys/${surveyId}/answers/mine`
+          )
+          .catch(() => ({ answers: [] as FreetextAnswer[] })),
+      ]);
+
+      setOptions(optionsData.options);
+      setQuestions(questionsData.questions);
+
+      const initial: Record<string, string> = {};
+      for (const q of questionsData.questions) {
+        initial[q.id] = "";
+      }
+      if (mineData.answers.length > 0) {
+        setHasSubmitted(true);
+        for (const a of mineData.answers) {
+          initial[a.question_id] = a.text;
+        }
+      }
+      setAnswers(initial);
+    } catch {
+      setError("Daten konnten nicht geladen werden");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [surveyId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  function setAnswerValue(questionId: string, value: string) {
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
+    setError(null);
+  }
+
+  function getMissingQuestions(): FreetextQuestion[] {
+    return questions.filter((q) => (answers[q.id] ?? "").trim().length === 0);
+  }
+
+  async function handleSubmit() {
+    const missing = getMissingQuestions();
+    if (missing.length > 0) {
+      setError("Bitte beantworte alle Fragen");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    const payload = questions.map((q) => ({
+      questionId: q.id,
+      text: (answers[q.id] ?? "").trim(),
+    }));
+
+    try {
+      await api.post(`/api/surveys/${surveyId}/answers`, { answers: payload });
+      setHasSubmitted(true);
+      toast.success("Antworten gespeichert!");
+      onAnswerSubmit?.();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Antworten konnten nicht gespeichert werden"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (isLoading) {
+    return <VotingPanelSkeleton />;
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Für diese Umfrage wurden noch keine Fragen definiert.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+          Freitext-Befragung
+        </h2>
+        {hasSubmitted && (
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+            Beantwortet
+          </span>
+        )}
+      </div>
+
+      {error && (
+        <p className="mb-4 text-sm text-red-500 dark:text-red-400">{error}</p>
+      )}
+
+      <div className="space-y-6">
+        {options.map((option) => {
+          const optionQuestions = questions.filter(
+            (q) => q.option_id === option.id
+          );
+          if (optionQuestions.length === 0) return null;
+          return (
+            <div
+              key={option.id}
+              className="rounded-lg border border-zinc-100 bg-zinc-50 p-4 dark:border-zinc-700 dark:bg-zinc-800"
+            >
+              <div className="mb-3">
+                <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                  {option.title}
+                </p>
+                {option.description && (
+                  <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+                    {option.description}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {optionQuestions.map((q) => (
+                  <div key={q.id}>
+                    <label
+                      htmlFor={`question-${q.id}`}
+                      className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300"
+                    >
+                      {q.text}
+                    </label>
+                    <textarea
+                      id={`question-${q.id}`}
+                      value={answers[q.id] ?? ""}
+                      onChange={(e) => setAnswerValue(q.id, e.target.value)}
+                      maxLength={ANSWER_TEXT_MAX}
+                      rows={3}
+                      placeholder="Deine Antwort..."
+                      className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+                    />
+                    <p className="mt-0.5 text-right text-xs text-zinc-400 dark:text-zinc-500">
+                      {(answers[q.id] ?? "").length} / {ANSWER_TEXT_MAX}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <button
+        onClick={handleSubmit}
+        disabled={isSubmitting}
+        className="mt-6 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isSubmitting
+          ? "Wird gespeichert..."
+          : hasSubmitted
+            ? "Antworten aktualisieren"
+            : "Antworten absenden"}
+      </button>
     </div>
   );
 }
