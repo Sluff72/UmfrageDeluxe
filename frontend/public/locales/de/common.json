@@ -37,7 +37,16 @@
     "submit": "Absenden",
     "join": "Beitreten",
     "share": "Teilen",
-    "archive": "Archivieren"
+    "archive": "Archivieren",
+    "import": "Importieren"
+  },
+  "import": {
+    "title": "Umfragen importieren",
+    "choose_file": "CSV-Datei wählen",
+    "download_template": "Beispiel-CSV herunterladen",
+    "preview": "Vorschau",
+    "success": "Umfragen importiert",
+    "error": "Import fehlgeschlagen"
   },
   "connection": {
     "connecting": "Verbinde...",

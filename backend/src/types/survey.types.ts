@@ -40,6 +40,15 @@ export interface CreateSurveyInput {
   allowAnonymous?: boolean;
 }
 
+export interface BulkImportOptionInput {
+  title: string;
+  description?: string;
+}
+
+export interface BulkImportSurveyInput extends CreateSurveyInput {
+  options?: BulkImportOptionInput[];
+}
+
 export interface UpdateSurveyInput {
   title?: string;
   description?: string;

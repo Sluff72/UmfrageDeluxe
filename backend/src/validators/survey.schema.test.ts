@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { createSurveySchema, updateSurveySchema } from './survey.schema';
+import { createSurveySchema, updateSurveySchema, bulkImportSurveysSchema } from './survey.schema';
 
 // ---------------------------------------------------------------------------
 // createSurveySchema
@@ -313,5 +313,62 @@ describe('updateSurveySchema – UMF-16 / UMF-18', () => {
   it('should accept updating allowAnonymous to false', () => {
     const result = updateSurveySchema.safeParse({ allowAnonymous: false });
     expect(result.success).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// bulkImportSurveysSchema – CSV-Bulk-Import
+// ---------------------------------------------------------------------------
+
+describe('bulkImportSurveysSchema – CSV-Bulk-Import', () => {
+  it('should accept multiple surveys with options', () => {
+    const result = bulkImportSurveysSchema.safeParse({
+      surveys: [
+        {
+          title: 'Umfrage 1',
+          votingMethod: 'widerstand',
+          options: [{ title: 'Option A' }, { title: 'Option B', description: 'Desc' }],
+        },
+        { title: 'Umfrage 2', votingMethod: 'mehrheit' },
+      ],
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should reject an empty surveys array', () => {
+    const result = bulkImportSurveysSchema.safeParse({ surveys: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject more than 50 surveys', () => {
+    const surveys = Array.from({ length: 51 }, (_, i) => ({
+      title: `Umfrage ${i}`,
+      votingMethod: 'widerstand' as const,
+    }));
+    const result = bulkImportSurveysSchema.safeParse({ surveys });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject a survey with more than 100 options', () => {
+    const options = Array.from({ length: 101 }, (_, i) => ({ title: `Option ${i}` }));
+    const result = bulkImportSurveysSchema.safeParse({
+      surveys: [{ title: 'Zu viele', votingMethod: 'widerstand', options }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject an invalid voting method inside a survey', () => {
+    const result = bulkImportSurveysSchema.safeParse({
+      surveys: [{ title: 'Bad', votingMethod: 'nope' }],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject an option with an empty title', () => {
+    const result = bulkImportSurveysSchema.safeParse({
+      surveys: [{ title: 'Survey', votingMethod: 'widerstand', options: [{ title: '' }] }],
+    });
+    expect(result.success).toBe(false);
   });
 });

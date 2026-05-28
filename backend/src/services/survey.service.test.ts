@@ -147,6 +147,156 @@ describe('SurveyService', () => {
   });
 
   // =========================================================================
+  // bulkImportSurveys
+  // =========================================================================
+
+  describe('bulkImportSurveys', () => {
+    it('should create multiple surveys in entwurf status owned by the importer', async () => {
+      const userId = await createTestUser();
+
+      const created = service.bulkImportSurveys(
+        [
+          { title: 'Umfrage 1', votingMethod: 'widerstand' },
+          { title: 'Umfrage 2', votingMethod: 'mehrheit' },
+        ],
+        userId
+      );
+
+      expect(created).toHaveLength(2);
+      created.forEach((survey) => {
+        expect(survey.status).toBe('entwurf');
+        expect(survey.created_by).toBe(userId);
+      });
+      expect(created[0].title).toBe('Umfrage 1');
+      expect(created[1].voting_method).toBe('mehrheit');
+    });
+
+    it('should add the importer as host participant for each survey', async () => {
+      const userId = await createTestUser();
+
+      const created = service.bulkImportSurveys(
+        [{ title: 'Solo', votingMethod: 'widerstand' }],
+        userId
+      );
+
+      const db = getDatabase();
+      const participant = db
+        .prepare(
+          `SELECT * FROM survey_participants WHERE survey_id = ? AND user_id = ?`
+        )
+        .get(created[0].id, userId) as SurveyParticipant | undefined;
+
+      expect(participant).toBeDefined();
+      expect(participant!.role).toBe('host');
+    });
+
+    it('should generate unique invite codes across imported surveys', async () => {
+      const userId = await createTestUser();
+
+      const created = service.bulkImportSurveys(
+        [
+          { title: 'A', votingMethod: 'widerstand' },
+          { title: 'B', votingMethod: 'widerstand' },
+        ],
+        userId
+      );
+
+      expect(created[0].invite_code).not.toBe(created[1].invite_code);
+    });
+
+    it('should insert options with sequential positions attributed to the host', async () => {
+      const userId = await createTestUser();
+
+      const created = service.bulkImportSurveys(
+        [
+          {
+            title: 'Mit Optionen',
+            votingMethod: 'widerstand',
+            options: [
+              { title: 'Option A', description: 'Beschreibung A' },
+              { title: 'Option B' },
+              { title: 'Option C', description: 'Beschreibung C' },
+            ],
+          },
+        ],
+        userId
+      );
+
+      const db = getDatabase();
+      const host = db
+        .prepare(
+          `SELECT id FROM survey_participants WHERE survey_id = ? AND role = 'host'`
+        )
+        .get(created[0].id) as { id: string };
+
+      const rows = db
+        .prepare(
+          'SELECT title, description, position, created_by FROM options WHERE survey_id = ? ORDER BY position ASC'
+        )
+        .all(created[0].id) as {
+        title: string;
+        description: string | null;
+        position: number;
+        created_by: string;
+      }[];
+
+      expect(rows).toEqual([
+        { title: 'Option A', description: 'Beschreibung A', position: 0, created_by: host.id },
+        { title: 'Option B', description: null, position: 1, created_by: host.id },
+        { title: 'Option C', description: 'Beschreibung C', position: 2, created_by: host.id },
+      ]);
+    });
+
+    it('should respect optional survey fields and defaults', async () => {
+      const userId = await createTestUser();
+
+      const created = service.bulkImportSurveys(
+        [
+          {
+            title: 'Voll',
+            description: 'Desc',
+            votingMethod: 'widerstand_punkte',
+            wMax: 12,
+            maxPointsPerOption: 4,
+            allowAnonymous: false,
+          },
+          { title: 'Default', votingMethod: 'widerstand' },
+        ],
+        userId
+      );
+
+      expect(created[0].description).toBe('Desc');
+      expect(created[0].w_max).toBe(12);
+      expect(created[0].max_points_per_option).toBe(4);
+      expect(created[0].allow_anonymous).toBe(0);
+
+      expect(created[1].max_points_per_option).toBe(5);
+      expect(created[1].allow_anonymous).toBe(1);
+    });
+
+    it('should roll back the entire batch if any survey fails', async () => {
+      const userId = await createTestUser();
+      const db = getDatabase();
+
+      // Force a failure on the second survey by violating the NOT NULL title constraint.
+      expect(() =>
+        service.bulkImportSurveys(
+          [
+            { title: 'Gut', votingMethod: 'widerstand' },
+            { title: null as unknown as string, votingMethod: 'widerstand' },
+          ],
+          userId
+        )
+      ).toThrow();
+
+      const count = db
+        .prepare('SELECT COUNT(*) as n FROM surveys')
+        .get() as { n: number };
+      expect(count.n).toBe(0);
+    });
+  });
+
+  // =========================================================================
   // getSurveyById
   // =========================================================================
 
