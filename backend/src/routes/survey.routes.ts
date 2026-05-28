@@ -4,7 +4,7 @@ import { validate } from '../middleware/validate';
 import { requireAuth } from '../middleware/auth';
 import { optionalAuth } from '../middleware/optionalAuth';
 import { requireRole } from '../middleware/surveyRole';
-import { createSurveySchema, updateSurveySchema, updateParticipantRoleSchema } from '../validators/survey.schema';
+import { createSurveySchema, updateSurveySchema, updateParticipantRoleSchema, bulkImportSurveysSchema } from '../validators/survey.schema';
 import { transitionSchema } from '../validators/transition.schema';
 
 const surveyRouter = Router();
@@ -22,6 +22,14 @@ surveyRouter.post(
   requireAuth,
   validate(createSurveySchema),
   (req, res, next) => surveyController.createSurvey(req, res, next)
+);
+
+// Bulk import (before :id routes to avoid matching "import" as an ID)
+surveyRouter.post(
+  '/surveys/import',
+  requireAuth,
+  validate(bulkImportSurveysSchema),
+  (req, res, next) => surveyController.bulkImportSurveys(req, res, next)
 );
 
 surveyRouter.get(

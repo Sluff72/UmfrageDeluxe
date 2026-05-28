@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import Header from "@/components/Header";
 import EmptyState from "@/components/EmptyState";
+import ImportSurveysDialog from "@/components/ImportSurveysDialog";
 import { SurveyCardSkeleton } from "@/components/Skeleton";
 import type { SurveyWithParticipantCount } from "@/types/survey";
 import {
@@ -20,6 +21,7 @@ export default function DashboardPage() {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
   const [surveys, setSurveys] = useState<SurveyWithParticipantCount[]>([]);
   const [isLoadingSurveys, setIsLoadingSurveys] = useState(true);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const fetchSurveys = useCallback(async () => {
     try {
@@ -85,12 +87,20 @@ export default function DashboardPage() {
           <h2 className="text-xl font-bold text-zinc-900 sm:text-2xl dark:text-zinc-50">
             Meine Umfragen
           </h2>
-          <Link
-            href="/survey/new"
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
-          >
-            Neue Umfrage
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsImportOpen(true)}
+              className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            >
+              Importieren
+            </button>
+            <Link
+              href="/survey/new"
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
+            >
+              Neue Umfrage
+            </Link>
+          </div>
         </div>
 
         {isLoadingSurveys ? (
@@ -130,6 +140,12 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      <ImportSurveysDialog
+        open={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImported={fetchSurveys}
+      />
     </div>
   );
 }

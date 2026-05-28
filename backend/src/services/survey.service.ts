@@ -6,6 +6,7 @@ import type {
   SurveyWithParticipantCount,
   CreateSurveyInput,
   UpdateSurveyInput,
+  BulkImportSurveyInput,
 } from '../types/survey.types';
 import type { SurveyParticipant } from '../types/user.types';
 
@@ -52,6 +53,67 @@ export class SurveyService {
       .run(survey.id, userId);
 
     return survey;
+  }
+
+  /**
+   * Bulk-import multiple surveys (with their options) in a single transaction.
+   * Each survey is created in the default `entwurf` phase, the importing user
+   * becomes its host, and options are inserted directly (attributed to the host)
+   * so no phase transition is required. All-or-nothing: any failure rolls back
+   * every survey in the batch.
+   */
+  bulkImportSurveys(inputs: BulkImportSurveyInput[], userId: string): Survey[] {
+    const database = getDatabase();
+
+    const insertSurvey = database.prepare(
+      `INSERT INTO surveys (title, description, voting_method, w_max, max_points_per_option, invite_code, allow_anonymous, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       RETURNING *`
+    );
+
+    const insertHost = database.prepare(
+      `INSERT INTO survey_participants (survey_id, user_id, role)
+       VALUES (?, ?, 'host')
+       RETURNING id`
+    );
+
+    const insertOption = database.prepare(
+      `INSERT INTO options (survey_id, title, description, created_by, position)
+       VALUES (?, ?, ?, ?, ?)`
+    );
+
+    const importTransaction = database.transaction(() => {
+      return inputs.map((input) => {
+        const inviteCode = this.generateUniqueInviteCode();
+
+        const survey = insertSurvey.get(
+          input.title,
+          input.description ?? null,
+          input.votingMethod,
+          input.wMax ?? null,
+          input.maxPointsPerOption ?? 5,
+          inviteCode,
+          input.allowAnonymous !== false ? 1 : 0,
+          userId
+        ) as Survey;
+
+        const host = insertHost.get(survey.id, userId) as { id: string };
+
+        (input.options ?? []).forEach((option, index) => {
+          insertOption.run(
+            survey.id,
+            option.title,
+            option.description ?? null,
+            host.id,
+            index
+          );
+        });
+
+        return survey;
+      });
+    });
+
+    return importTransaction();
   }
 
   getSurveyById(surveyId: string): Survey {

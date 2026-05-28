@@ -8,6 +8,7 @@ import type {
   CreateSurveySchemaInput,
   UpdateSurveySchemaInput,
   UpdateParticipantRoleSchemaInput,
+  BulkImportSurveysSchemaInput,
 } from '../validators/survey.schema';
 
 export class SurveyController {
@@ -18,6 +19,18 @@ export class SurveyController {
 
       const survey = surveyService.createSurvey(input, userId);
       res.status(201).json({ survey });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async bulkImportSurveys(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { surveys }: BulkImportSurveysSchemaInput = req.body;
+      const userId = req.user!.sub;
+
+      const created = surveyService.bulkImportSurveys(surveys, userId);
+      res.status(201).json({ surveys: created, count: created.length });
     } catch (error) {
       next(error);
     }
