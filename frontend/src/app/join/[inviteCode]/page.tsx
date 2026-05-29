@@ -25,11 +25,18 @@ export default function JoinPage() {
   const inviteCode = params.inviteCode as string;
 
   const [displayName, setDisplayName] = useState("");
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!privacyAccepted) {
+      setError("Bitte bestätige, dass du die Datenschutzbedingungen gelesen hast");
+      return;
+    }
+
     setIsJoining(true);
     setError(null);
 
@@ -150,10 +157,33 @@ export default function JoinPage() {
               </span>
             </div>
 
+            {/* Privacy consent */}
+            <label className="mb-6 flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
+              <input
+                type="checkbox"
+                checked={privacyAccepted}
+                onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                required
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-purple-600 focus:ring-1 focus:ring-purple-500 dark:border-zinc-600 dark:bg-zinc-800"
+              />
+              <span>
+                Ich habe die{" "}
+                <a
+                  href="/datenschutz.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-purple-600 underline hover:no-underline dark:text-purple-400"
+                >
+                  Datenschutzbedingungen
+                </a>{" "}
+                gelesen.
+              </span>
+            </label>
+
             {/* Join button */}
             <button
               type="submit"
-              disabled={isJoining || (!user && !displayName.trim())}
+              disabled={isJoining || !privacyAccepted || (!user && !displayName.trim())}
               className="w-full rounded-lg bg-purple-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-purple-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isJoining ? "Beitritt..." : "Umfrage beitreten"}
