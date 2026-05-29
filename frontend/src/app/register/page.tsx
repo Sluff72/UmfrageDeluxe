@@ -13,12 +13,18 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+
+    if (!privacyAccepted) {
+      setError("Bitte bestätige, dass du die Datenschutzbedingungen gelesen hast");
+      return;
+    }
 
     if (password !== passwordConfirm) {
       setError("Passwörter stimmen nicht überein");
@@ -143,6 +149,28 @@ export default function RegisterPage() {
               />
             </div>
 
+            <label className="flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
+              <input
+                type="checkbox"
+                checked={privacyAccepted}
+                onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                required
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-300 text-zinc-900 focus:ring-2 focus:ring-zinc-500/20 dark:border-zinc-600 dark:bg-zinc-800"
+              />
+              <span>
+                Ich habe die{" "}
+                <a
+                  href="/datenschutz.html"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-zinc-900 underline hover:no-underline dark:text-zinc-100"
+                >
+                  Datenschutzbedingungen
+                </a>{" "}
+                gelesen.
+              </span>
+            </label>
+
             {error && (
               <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-950/50 dark:text-red-400">
                 {error}
@@ -151,7 +179,7 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !privacyAccepted}
               className="w-full rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
               {isSubmitting ? "Registrieren..." : "Registrieren"}
