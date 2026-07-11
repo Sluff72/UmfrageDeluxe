@@ -16,6 +16,7 @@ import ResultsPanel from "@/components/ResultsPanel";
 import ParticipantsList from "@/components/ParticipantsList";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import VotingMethodEditor from "@/components/VotingMethodEditor";
+import InviteQrCode from "@/components/InviteQrCode";
 import type { Survey, SurveyParticipant, TransitionInfo } from "@/types/survey";
 import {
   SURVEY_STATUS_LABELS,
@@ -417,6 +418,10 @@ export default function SurveyDetailPage() {
                 <p className="mt-2 text-center text-xs text-zinc-400 dark:text-zinc-500">
                   Code: {survey.invite_code}
                 </p>
+                <InviteQrCode
+                  inviteCode={survey.invite_code}
+                  surveyTitle={survey.title}
+                />
               </div>
             )}
 
