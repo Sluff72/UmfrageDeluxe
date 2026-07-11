@@ -2,103 +2,36 @@
 
 Konsensorientiertes Online-Umfragetool mit widerstandsbasierter Abstimmung, Einwand-Integration und Phasen-Workflow.
 
+Statt klassischer Mehrheitsentscheide misst UmfrageDeluxe den **Widerstand** der Teilnehmenden gegen jede Option (Systemisches Konsensieren). Einwände können formuliert und in die Optionen integriert werden, danach ist ein Re-Vote möglich – bis die Gruppe eine tragfähige Entscheidung gefunden hat.
+
+## Features
+
+- **Widerstandsbasierte Abstimmung**: Bewertung von 0 (kein Widerstand) bis 10 (maximaler Widerstand) pro Option
+- **Phasen-Workflow**: Entwurf → Optionen sammeln → Abstimmen → Einwand-Integration → Beendet (mit Re-Vote-Schleife)
+- **Anonyme Teilnahme**: Teilnehmende brauchen kein Konto – Beitritt per Link oder QR-Code
+- **Rollen**: Host, Co-Host und Teilnehmer:innen pro Umfrage
+- **Echtzeit-Updates**: Live-Abstimmungsfortschritt und Ergebnisse via Socket.IO
+
 ## Tech Stack
 
 - **Frontend**: Next.js (App Router) + Tailwind CSS + TypeScript
 - **Backend**: Node.js + Express + TypeScript
 - **Datenbank**: SQLite (better-sqlite3)
 - **Echtzeit**: Socket.IO
-- **Containerisierung**: Docker + Caddy Reverse Proxy
+- **Containerisierung**: Docker + Docker Compose
 
-## Lokale Entwicklung
+## Installation & Hosting
+
+Die vollständige Anleitung für lokale Entwicklung, Docker-Setup und Production-Deployment (inkl. Reverse Proxy und Backups) steht in **[INSTALL.md](INSTALL.md)**.
+
+Kurzfassung für die lokale Entwicklung:
 
 ```bash
-# Backend starten
+# Backend (Port 3001)
 cd backend/ && npm install && npm run dev
 
-# Frontend starten (in neuem Terminal)
+# Frontend (Port 3000, in neuem Terminal)
 cd frontend/ && npm install && npm run dev
-```
-
-Backend läuft auf `http://localhost:3001`, Frontend auf `http://localhost:3000`.
-
-## Lokale Entwicklung mit Docker
-
-```bash
-docker compose build
-docker compose up
-```
-
-Öffne `http://localhost:3000` im Browser.
-
-## Production Deployment
-
-### Voraussetzungen
-
-- Server mit Docker und Docker Compose (z.B. Hetzner CX22, ab ~3,50 EUR/Monat)
-- Domain mit DNS-A-Record auf die Server-IP
-
-### Schritte
-
-1. Repository auf den Server klonen:
-
-```bash
-git clone <repo-url> umfrage-deluxe
-cd umfrage-deluxe
-```
-
-2. `.env`-Datei aus dem Beispiel erstellen:
-
-```bash
-cp .env.production.example .env
-```
-
-3. Werte in `.env` eintragen:
-
-```env
-JWT_SECRET=<openssl rand -base64 32>
-SITE_ADDRESS=umfrage.deinedomain.de
-```
-
-4. Production-Stack starten:
-
-```bash
-docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml up -d
-```
-
-Caddy kümmert sich automatisch um SSL-Zertifikate via Let's Encrypt.
-
-### Architektur (Production)
-
-```
-Internet → Caddy (:80/:443)
-              ├── /api/*        → Backend (:3001)
-              ├── /socket.io/*  → Backend (:3001)
-              └── /*            → Frontend (:3000)
-```
-
-- **Caddy**: Reverse Proxy + automatisches SSL
-- **Frontend**: Next.js Standalone (keine exponierten Ports)
-- **Backend**: Express + Socket.IO (keine exponierten Ports)
-- **SQLite**: Persistiert in Docker Named Volume
-
-### Nützliche Befehle
-
-```bash
-# Logs anzeigen
-docker compose -f docker-compose.prod.yml logs -f
-
-# Neustart
-docker compose -f docker-compose.prod.yml restart
-
-# Update deployen
-git pull
-docker compose -f docker-compose.prod.yml build
-docker compose -f docker-compose.prod.yml up -d
-
-# Stoppen
-docker compose -f docker-compose.prod.yml down
 ```
 
 ## Tests
@@ -106,3 +39,21 @@ docker compose -f docker-compose.prod.yml down
 ```bash
 cd backend/ && npm test
 ```
+
+## Lizenz
+
+UmfrageDeluxe ist freie Software, lizenziert unter der **GNU Affero General Public License v3.0 oder später (AGPL-3.0-or-later)**. Der vollständige Lizenztext steht in [LICENSE](LICENSE).
+
+Das bedeutet insbesondere:
+
+- Du darfst die Software nutzen, verändern und weitergeben – auch kommerziell.
+- Wer eine veränderte Version **weitergibt oder als Netzwerkdienst betreibt** (z.B. öffentlich hostet), muss den vollständigen Quellcode dieser Version unter derselben Lizenz zugänglich machen (AGPL §13).
+- Die eingebauten Copyright- und Lizenzhinweise (u.a. der Quellcode-Link im Footer der App) müssen erhalten bleiben.
+
+Copyright (C) 2026 Heinz Brasch
+
+## Transparenzhinweis: KI-generierte Inhalte
+
+Dieses Projekt wurde **agentisch codiert**: Der Quellcode wurde in wesentlichen Teilen mithilfe von KI-Assistenten (Claude / Claude Code von Anthropic) unter menschlicher Anleitung und Review von Heinz Brasch entwickelt. Auch diese Dokumentation sowie [INSTALL.md](INSTALL.md) wurden KI-generiert und anschließend menschlich geprüft.
+
+Dieser Hinweis dient der Kenntlichmachung KI-generierter Inhalte im Sinne der Transparenzanforderungen der EU-KI-Verordnung (EU AI Act, Verordnung (EU) 2024/1689).
