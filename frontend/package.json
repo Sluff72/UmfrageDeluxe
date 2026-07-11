@@ -2,6 +2,12 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "license": "AGPL-3.0-or-later",
+  "author": "Heinz Brasch",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sluff72/UmfrageDeluxe.git"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

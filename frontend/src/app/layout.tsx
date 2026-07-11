@@ -39,6 +39,27 @@ export default function RootLayout({
         <AuthProvider>
           <ToastProvider>{children}</ToastProvider>
         </AuthProvider>
+        {/* AGPL §13: source offer for network users */}
+        <footer className="border-t border-zinc-200 py-4 text-center text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+          UmfrageDeluxe ist freie Software unter der{" "}
+          <a
+            href="https://github.com/Sluff72/UmfrageDeluxe/blob/main/LICENSE"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-zinc-700 dark:hover:text-zinc-200"
+          >
+            AGPL-3.0-Lizenz
+          </a>
+          {" – "}
+          <a
+            href="https://github.com/Sluff72/UmfrageDeluxe"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-zinc-700 dark:hover:text-zinc-200"
+          >
+            Quellcode
+          </a>
+        </footer>
       </body>
     </html>
   );
