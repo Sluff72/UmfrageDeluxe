@@ -29,8 +29,8 @@ export class SurveyService {
 
     const survey = database
       .prepare(
-        `INSERT INTO surveys (title, description, voting_method, w_max, max_points_per_option, invite_code, allow_anonymous, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO surveys (title, description, voting_method, w_max, max_points_per_option, invite_code, allow_anonymous, anonymous_voting, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          RETURNING *`
       )
       .get(
@@ -41,6 +41,7 @@ export class SurveyService {
         input.maxPointsPerOption ?? 5,
         inviteCode,
         input.allowAnonymous !== false ? 1 : 0,
+        input.anonymousVoting !== false ? 1 : 0,
         userId
       ) as Survey;
 
@@ -66,8 +67,8 @@ export class SurveyService {
     const database = getDatabase();
 
     const insertSurvey = database.prepare(
-      `INSERT INTO surveys (title, description, voting_method, w_max, max_points_per_option, invite_code, allow_anonymous, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO surveys (title, description, voting_method, w_max, max_points_per_option, invite_code, allow_anonymous, anonymous_voting, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        RETURNING *`
     );
 
@@ -94,6 +95,7 @@ export class SurveyService {
           input.maxPointsPerOption ?? 5,
           inviteCode,
           input.allowAnonymous !== false ? 1 : 0,
+          input.anonymousVoting !== false ? 1 : 0,
           userId
         ) as Survey;
 
@@ -176,7 +178,8 @@ export class SurveyService {
       if (
         input.title !== undefined ||
         input.description !== undefined ||
-        input.allowAnonymous !== undefined
+        input.allowAnonymous !== undefined ||
+        input.anonymousVoting !== undefined
       ) {
         throw new ForbiddenError(
           'In der Phase "Optionen Sammeln" können nur Abstimmungsmethode, W-Max und Punkte pro Option geändert werden'
@@ -195,6 +198,7 @@ export class SurveyService {
            w_max = COALESCE(?, w_max),
            max_points_per_option = COALESCE(?, max_points_per_option),
            allow_anonymous = COALESCE(?, allow_anonymous),
+           anonymous_voting = COALESCE(?, anonymous_voting),
            updated_at = datetime('now')
          WHERE id = ?
          RETURNING *`
@@ -206,6 +210,7 @@ export class SurveyService {
         input.wMax ?? null,
         input.maxPointsPerOption ?? null,
         input.allowAnonymous !== undefined ? (input.allowAnonymous ? 1 : 0) : null,
+        input.anonymousVoting !== undefined ? (input.anonymousVoting ? 1 : 0) : null,
         surveyId
       ) as Survey;
 
@@ -244,9 +249,9 @@ export class SurveyService {
           `INSERT INTO surveys (
               title, description, status, voting_method,
               w_max, max_points_per_option,
-              invite_code, allow_anonymous, created_by
+              invite_code, allow_anonymous, anonymous_voting, created_by
             )
-            VALUES (?, ?, 'optionen_sammeln', ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, 'optionen_sammeln', ?, ?, ?, ?, ?, ?, ?)
             RETURNING *`
         )
         .get(
@@ -257,6 +262,7 @@ export class SurveyService {
           original.max_points_per_option,
           newInviteCode,
           original.allow_anonymous,
+          original.anonymous_voting,
           userId
         ) as Survey;
 

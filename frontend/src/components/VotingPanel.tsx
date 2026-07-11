@@ -22,6 +22,8 @@ interface VotingPanelProps {
   votingMethod: VotingMethod;
   wMax: number | null;
   maxPointsPerOption: number | null;
+  /** false = non-anonymous survey: votes are visible per participant name */
+  anonymousVoting?: boolean;
   onVoteSubmit?: () => void;
 }
 
@@ -30,6 +32,7 @@ export default function VotingPanel({
   votingMethod,
   wMax,
   maxPointsPerOption,
+  anonymousVoting = true,
   onVoteSubmit,
 }: VotingPanelProps) {
   const [options, setOptions] = useState<SurveyOption[]>([]);
@@ -152,6 +155,14 @@ export default function VotingPanel({
           </span>
         )}
       </div>
+
+      {/* Transparency notice for non-anonymous surveys */}
+      {!anonymousVoting && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
+          Diese Abstimmung ist nicht anonym – dein Name wird bei den
+          Ergebnissen zusammen mit deiner Stimme angezeigt.
+        </div>
+      )}
 
       {/* Budget indicator for widerstand_punkte */}
       {votingMethod === "widerstand_punkte" && wMax !== null && (

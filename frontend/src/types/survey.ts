@@ -22,6 +22,8 @@ export interface Survey {
   max_points_per_option: number | null;
   invite_code: string;
   allow_anonymous: number;
+  /** 1 = votes are anonymous, 0 = results can be viewed per participant name */
+  anonymous_voting: number;
   is_archived: number;
   created_by: string;
   created_at: string;
@@ -49,6 +51,19 @@ export interface CreateSurveyInput {
   wMax?: number;
   maxPointsPerOption?: number;
   allowAnonymous?: boolean;
+  anonymousVoting?: boolean;
+}
+
+export interface ParticipantVote {
+  option_id: string;
+  option_title: string;
+  value: number;
+}
+
+export interface ParticipantResult {
+  participant_id: string;
+  participant_name: string;
+  votes: ParticipantVote[];
 }
 
 export interface SurveyOption {

@@ -2,7 +2,15 @@ import { getDatabase } from '../config/database';
 import { ForbiddenError, ValidationError } from '../utils/errors';
 import { surveyService } from './survey.service';
 import { stateMachineService } from './stateMachine.service';
-import type { Vote, VoteInput, VoteResult, VoteResultWithObjections, ObjectionWithAuthor } from '../types/vote.types';
+import type {
+  Vote,
+  VoteInput,
+  VoteResult,
+  VoteResultWithObjections,
+  ObjectionWithAuthor,
+  ParticipantResult,
+  ParticipantVote,
+} from '../types/vote.types';
 import type { Survey } from '../types/survey.types';
 import type { SurveyParticipant } from '../types/user.types';
 
@@ -169,6 +177,62 @@ export class VoteService {
       ...r,
       objections: objectionsByOption.get(r.option_id) ?? [],
     }));
+  }
+
+  /**
+   * Get per-participant results (who voted what) for the current round.
+   * Only available for surveys with non-anonymous voting.
+   */
+  getResultsByParticipant(surveyId: string): ParticipantResult[] {
+    const survey = surveyService.getSurveyById(surveyId);
+
+    if (survey.anonymous_voting) {
+      throw new ForbiddenError(
+        'Diese Umfrage ist anonym – Ergebnisse sind nur aggregiert verfügbar'
+      );
+    }
+
+    const database = getDatabase();
+    const currentRound = stateMachineService.getCurrentVotingRound(surveyId);
+
+    const rows = database
+      .prepare(
+        `SELECT
+           sp.id as participant_id,
+           COALESCE(u.display_name, u.username, sp.anonymous_name, 'Anonym') as participant_name,
+           v.option_id,
+           o.title as option_title,
+           v.value
+         FROM votes v
+         INNER JOIN survey_participants sp ON sp.id = v.participant_id
+         INNER JOIN options o ON o.id = v.option_id
+         LEFT JOIN users u ON u.id = sp.user_id
+         WHERE v.survey_id = ? AND v.voting_round = ?
+         ORDER BY participant_name ASC, o.position ASC`
+      )
+      .all(surveyId, currentRound) as Array<
+      ParticipantVote & { participant_id: string; participant_name: string }
+    >;
+
+    const byParticipant = new Map<string, ParticipantResult>();
+    for (const row of rows) {
+      let entry = byParticipant.get(row.participant_id);
+      if (!entry) {
+        entry = {
+          participant_id: row.participant_id,
+          participant_name: row.participant_name,
+          votes: [],
+        };
+        byParticipant.set(row.participant_id, entry);
+      }
+      entry.votes.push({
+        option_id: row.option_id,
+        option_title: row.option_title,
+        value: row.value,
+      });
+    }
+
+    return Array.from(byParticipant.values());
   }
 
   /**

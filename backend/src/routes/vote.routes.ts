@@ -39,4 +39,12 @@ voteRouter.get(
   (req, res, next) => voteController.getResults(req, res, next)
 );
 
+// Get per-participant results (only for surveys with non-anonymous voting)
+voteRouter.get(
+  '/surveys/:id/results/by-participant',
+  optionalAuth,
+  requireRole('host', 'co_host', 'teilnehmer'),
+  (req, res, next) => voteController.getResultsByParticipant(req, res, next)
+);
+
 export { voteRouter };

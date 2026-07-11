@@ -304,6 +304,7 @@ export default function SurveyDetailPage() {
                   votingMethod={survey.voting_method}
                   wMax={survey.w_max}
                   maxPointsPerOption={survey.max_points_per_option}
+                  anonymousVoting={survey.anonymous_voting === 1}
                   onVoteSubmit={refreshTransitionInfo}
                 />
               </>
@@ -318,6 +319,7 @@ export default function SurveyDetailPage() {
                 votingMethod={survey.voting_method}
                 surveyStatus={survey.status}
                 canManage={canManage}
+                anonymousVoting={survey.anonymous_voting === 1}
                 onObjectionChange={refreshTransitionInfo}
                 revision={votesRevision + objectionsRevision}
               />
@@ -349,6 +351,14 @@ export default function SurveyDetailPage() {
                   <dt className="text-zinc-400 dark:text-zinc-500">Methode</dt>
                   <dd className="font-medium text-zinc-900 dark:text-zinc-100">
                     {VOTING_METHOD_LABELS[survey.voting_method]}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-zinc-400 dark:text-zinc-500">
+                    Abstimmung
+                  </dt>
+                  <dd className="font-medium text-zinc-900 dark:text-zinc-100">
+                    {survey.anonymous_voting === 1 ? "Anonym" : "Namentlich"}
                   </dd>
                 </div>
                 {survey.voting_method === "widerstand_punkte" &&

@@ -27,7 +27,7 @@ async function createTestUser(username = 'testhost'): Promise<string> {
 function createTestSurvey(
   userId: string,
   votingMethod: VotingMethod = 'widerstand',
-  opts?: { wMax?: number; maxPointsPerOption?: number }
+  opts?: { wMax?: number; maxPointsPerOption?: number; anonymousVoting?: boolean }
 ): Survey {
   const surveyService = new SurveyService();
   return surveyService.createSurvey(
@@ -36,6 +36,7 @@ function createTestSurvey(
       votingMethod,
       wMax: opts?.wMax,
       maxPointsPerOption: opts?.maxPointsPerOption,
+      anonymousVoting: opts?.anonymousVoting,
     },
     userId
   );
@@ -978,6 +979,95 @@ describe('VoteService', () => {
 
       // Original participant has not voted in round 2
       expect(service.hasVoted(survey.id, participantId)).toBe(false);
+    });
+  });
+
+  describe('getResultsByParticipant', () => {
+    it('should throw ForbiddenError for anonymous surveys', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId, 'widerstand');
+
+      expect(() => service.getResultsByParticipant(survey.id)).toThrow(
+        ForbiddenError
+      );
+    });
+
+    it('should return participant names with their votes for non-anonymous surveys', async () => {
+      const hostId = await createTestUser('namedhost');
+      const memberId = await createTestUser('namedmember');
+      const survey = createTestSurvey(hostId, 'widerstand', {
+        anonymousVoting: false,
+      });
+
+      const surveyService = new SurveyService();
+      surveyService.joinSurveyByInviteCode(survey.invite_code, memberId, null, null);
+
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const hostParticipantId = getParticipantId(survey.id, hostId);
+      const memberParticipantId = getParticipantId(survey.id, memberId);
+      const optionA = addTestOption(survey.id, hostParticipantId, 'Option A');
+      const optionB = addTestOption(survey.id, hostParticipantId, 'Option B');
+
+      setSurveyStatus(survey.id, 'abstimmen');
+      service.submitVotes(
+        survey.id,
+        [
+          { optionId: optionA.id, value: 2 },
+          { optionId: optionB.id, value: 7 },
+        ],
+        hostParticipantId
+      );
+      service.submitVotes(
+        survey.id,
+        [{ optionId: optionA.id, value: 5 }],
+        memberParticipantId
+      );
+
+      const results = service.getResultsByParticipant(survey.id);
+
+      expect(results).toHaveLength(2);
+
+      const host = results.find((r) => r.participant_id === hostParticipantId);
+      const member = results.find(
+        (r) => r.participant_id === memberParticipantId
+      );
+
+      expect(host?.participant_name).toBe('namedhost');
+      expect(host?.votes).toHaveLength(2);
+      expect(host?.votes[0]).toEqual({
+        option_id: optionA.id,
+        option_title: 'Option A',
+        value: 2,
+      });
+      expect(member?.participant_name).toBe('namedmember');
+      expect(member?.votes).toEqual([
+        { option_id: optionA.id, option_title: 'Option A', value: 5 },
+      ]);
+    });
+
+    it('should only include votes of the current round', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId, 'widerstand', {
+        anonymousVoting: false,
+      });
+
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+      const optionA = addTestOption(survey.id, participantId, 'Option A');
+
+      setSurveyStatus(survey.id, 'abstimmen');
+      service.submitVotes(
+        survey.id,
+        [{ optionId: optionA.id, value: 9 }],
+        participantId
+      );
+
+      // New round without any votes yet
+      setVotingRound(survey.id, 2);
+
+      const results = service.getResultsByParticipant(survey.id);
+
+      expect(results).toHaveLength(0);
     });
   });
 });

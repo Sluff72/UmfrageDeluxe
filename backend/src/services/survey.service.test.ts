@@ -75,6 +75,28 @@ describe('SurveyService', () => {
       expect(survey.updated_at).toBeTypeOf('string');
     });
 
+    it('should default to anonymous voting', async () => {
+      const userId = await createTestUser();
+
+      const survey = service.createSurvey(
+        { title: 'Anonymous Default', votingMethod: 'widerstand' },
+        userId
+      );
+
+      expect(survey.anonymous_voting).toBe(1);
+    });
+
+    it('should create a non-anonymous survey when anonymousVoting is false', async () => {
+      const userId = await createTestUser();
+
+      const survey = service.createSurvey(
+        { title: 'Named Voting', votingMethod: 'mehrheit', anonymousVoting: false },
+        userId
+      );
+
+      expect(survey.anonymous_voting).toBe(0);
+    });
+
     it('should generate a non-empty invite code', async () => {
       const userId = await createTestUser();
 
@@ -978,6 +1000,18 @@ describe('SurveyService', () => {
       expect(copy.w_max).toBe(25);
       expect(copy.max_points_per_option).toBe(5);
       expect(copy.allow_anonymous).toBe(0);
+    });
+
+    it('should carry over anonymous_voting', async () => {
+      const hostId = await createTestUser();
+      const original = service.createSurvey(
+        { title: 'Namentlich', votingMethod: 'widerstand', anonymousVoting: false },
+        hostId
+      );
+
+      const copy = service.duplicateSurvey(original.id, hostId);
+
+      expect(copy.anonymous_voting).toBe(0);
     });
 
     it('should copy all options preserving title, description and position', async () => {

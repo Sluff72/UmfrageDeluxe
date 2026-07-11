@@ -23,6 +23,7 @@ export default function NewSurveyPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [votingMethod, setVotingMethod] = useState<VotingMethod>("widerstand");
+  const [anonymousVoting, setAnonymousVoting] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,6 +42,7 @@ export default function NewSurveyPage() {
         title,
         description: description || undefined,
         votingMethod,
+        anonymousVoting,
       };
 
       const data = await api.post<{ survey: Survey }>("/api/surveys", body);
@@ -143,6 +145,42 @@ export default function NewSurveyPage() {
                   </label>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Anonymität
+              </label>
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition ${
+                  anonymousVoting
+                    ? "border-zinc-200 dark:border-zinc-700"
+                    : "border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/20"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={anonymousVoting}
+                  onChange={(e) => setAnonymousVoting(e.target.checked)}
+                  className="mt-0.5 accent-zinc-900 dark:accent-zinc-300"
+                />
+                <div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    Anonyme Abstimmung
+                  </span>
+                  <p className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">
+                    Stimmen werden nur als Gesamtergebnis angezeigt. Wenn
+                    deaktiviert, können die Ergebnisse zusätzlich pro Teilnehmer
+                    namentlich eingesehen werden.
+                  </p>
+                  {!anonymousVoting && (
+                    <p className="mt-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                      Alle Teilnehmer sehen, wer wie abgestimmt hat. Die
+                      Teilnehmer werden vor der Stimmabgabe darauf hingewiesen.
+                    </p>
+                  )}
+                </div>
+              </label>
             </div>
 
             {error && (
