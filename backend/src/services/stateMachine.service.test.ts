@@ -27,6 +27,11 @@ function setSurveyStatus(surveyId: string, status: string): void {
   db.prepare('UPDATE surveys SET status = ? WHERE id = ?').run(status, surveyId);
 }
 
+function setVotingRound(surveyId: string, round: number): void {
+  const db = getDatabase();
+  db.prepare('UPDATE surveys SET current_voting_round = ? WHERE id = ?').run(round, surveyId);
+}
+
 function addTestOption(surveyId: string, title: string): string {
   const db = getDatabase();
   // We need a participant (creator) for the option. Use the host.
@@ -615,6 +620,7 @@ describe('StateMachineService', () => {
 
       expect(result.survey.status).toBe('abstimmen');
       expect(result.previousStatus).toBe('einwand_integration');
+      expect(result.survey.current_voting_round).toBe(2);
 
       // Verify that pending objections were dismissed
       const db = getDatabase();
@@ -865,6 +871,7 @@ describe('StateMachineService', () => {
       addTestVote(survey.id, hostParticipantId, optionA, 1);
       addTestVote(survey.id, participantPartId, optionA, 1);
       addTestVote(survey.id, hostParticipantId, optionB, 2);
+      setVotingRound(survey.id, 2);
 
       const progress = smService.getVotingProgress(survey.id);
 
@@ -907,45 +914,61 @@ describe('StateMachineService', () => {
       expect(round).toBe(1);
     });
 
-    it('should return 2 when votes exist in round 2', async () => {
+    it('should return 2 after a re-vote transition', async () => {
       const userId = await createTestUser();
       const survey = surveyService.createSurvey(
         { title: 'Round 2', votingMethod: 'widerstand' },
         userId
       );
-      setSurveyStatus(survey.id, 'abstimmen');
+      setSurveyStatus(survey.id, 'einwand_integration');
 
       const optionId = addTestOption(survey.id, 'Option A');
       const hostParticipantId = getParticipantId(survey.id, userId);
-      addTestVote(survey.id, hostParticipantId, optionId, 1);
-      // Add a second option for a round 2 vote
-      const optionId2 = addTestOption(survey.id, 'Option B');
-      addTestVote(survey.id, hostParticipantId, optionId2, 2);
+      addTestObjection(survey.id, hostParticipantId, optionId, 'integrated');
+
+      smService.transitionSurvey(survey.id, 'abstimmen', userId);
 
       const round = smService.getCurrentVotingRound(survey.id);
 
       expect(round).toBe(2);
     });
 
-    it('should return the maximum round when multiple rounds exist', async () => {
+    it('should increment once per re-vote cycle', async () => {
       const userId = await createTestUser();
       const survey = surveyService.createSurvey(
         { title: 'Multi Round', votingMethod: 'widerstand' },
         userId
       );
-      setSurveyStatus(survey.id, 'abstimmen');
 
       const optionId = addTestOption(survey.id, 'Option A');
-      const optionId2 = addTestOption(survey.id, 'Option B');
-      const optionId3 = addTestOption(survey.id, 'Option C');
       const hostParticipantId = getParticipantId(survey.id, userId);
-      addTestVote(survey.id, hostParticipantId, optionId, 1);
-      addTestVote(survey.id, hostParticipantId, optionId2, 2);
-      addTestVote(survey.id, hostParticipantId, optionId3, 3);
+      addTestObjection(survey.id, hostParticipantId, optionId, 'integrated');
+
+      // Two full objection → re-vote cycles
+      setSurveyStatus(survey.id, 'einwand_integration');
+      smService.transitionSurvey(survey.id, 'abstimmen', userId);
+      setSurveyStatus(survey.id, 'einwand_integration');
+      smService.transitionSurvey(survey.id, 'abstimmen', userId);
 
       const round = smService.getCurrentVotingRound(survey.id);
 
       expect(round).toBe(3);
+    });
+
+    it('should not change the round for non-re-vote transitions', async () => {
+      const userId = await createTestUser();
+      const survey = surveyService.createSurvey(
+        { title: 'Stable Round', votingMethod: 'widerstand' },
+        userId
+      );
+
+      smService.transitionSurvey(survey.id, 'optionen_sammeln', userId);
+      addTestOption(survey.id, 'Option A');
+      addTestOption(survey.id, 'Option B');
+      smService.transitionSurvey(survey.id, 'abstimmen', userId);
+      smService.transitionSurvey(survey.id, 'einwand_integration', userId);
+
+      expect(smService.getCurrentVotingRound(survey.id)).toBe(1);
     });
   });
 });
