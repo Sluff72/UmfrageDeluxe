@@ -69,10 +69,17 @@ export interface TransitionOption {
   warning?: string;
 }
 
+export interface VotingProgress {
+  votedCount: number;
+  participantCount: number;
+}
+
 export interface TransitionInfo {
   currentStatus: SurveyStatus;
   availableTransitions: TransitionOption[];
   votingRound: number;
+  /** Only present for host/co-host during the voting phase */
+  votingProgress?: VotingProgress;
 }
 
 export type ObjectionStatus = "pending" | "integrated" | "dismissed";

@@ -725,6 +725,36 @@ describe('StateMachineService', () => {
       expect(info.votingRound).toBe(1);
     });
 
+    it('should include votingProgress during abstimmen', async () => {
+      const userId = await createTestUser();
+      const survey = surveyService.createSurvey(
+        { title: 'Progress Info', votingMethod: 'widerstand' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      const optionId = addTestOption(survey.id, 'Option A');
+      const hostParticipantId = getParticipantId(survey.id, userId);
+      addTestVote(survey.id, hostParticipantId, optionId, 1);
+
+      const info = smService.getTransitionInfo(survey.id);
+
+      expect(info.votingProgress).toEqual({ votedCount: 1, participantCount: 1 });
+    });
+
+    it('should not include votingProgress outside abstimmen', async () => {
+      const userId = await createTestUser();
+      const survey = surveyService.createSurvey(
+        { title: 'No Progress Info', votingMethod: 'widerstand' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+
+      const info = smService.getTransitionInfo(survey.id);
+
+      expect(info.votingProgress).toBeUndefined();
+    });
+
     it('should return multiple transitions for abstimmen status', async () => {
       const userId = await createTestUser();
       const survey = surveyService.createSurvey(
@@ -754,6 +784,92 @@ describe('StateMachineService', () => {
 
       expect(info.currentStatus).toBe('beendet');
       expect(info.availableTransitions).toHaveLength(0);
+    });
+  });
+
+  // =========================================================================
+  // getVotingProgress
+  // =========================================================================
+
+  describe('getVotingProgress', () => {
+    it('should return 0 voted when no votes exist', async () => {
+      const userId = await createTestUser();
+      const survey = surveyService.createSurvey(
+        { title: 'No Votes Progress', votingMethod: 'widerstand' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      const progress = smService.getVotingProgress(survey.id);
+
+      expect(progress.votedCount).toBe(0);
+      expect(progress.participantCount).toBe(1);
+    });
+
+    it('should count each participant once even with votes on multiple options', async () => {
+      const userId = await createTestUser();
+      const survey = surveyService.createSurvey(
+        { title: 'Distinct Voters', votingMethod: 'widerstand' },
+        userId
+      );
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      const optionA = addTestOption(survey.id, 'Option A');
+      const optionB = addTestOption(survey.id, 'Option B');
+      const hostParticipantId = getParticipantId(survey.id, userId);
+      addTestVote(survey.id, hostParticipantId, optionA, 1);
+      addTestVote(survey.id, hostParticipantId, optionB, 1);
+
+      const progress = smService.getVotingProgress(survey.id);
+
+      expect(progress.votedCount).toBe(1);
+      expect(progress.participantCount).toBe(1);
+    });
+
+    it('should count voters and participants across multiple participants', async () => {
+      const hostId = await createTestUser('host');
+      const participantId = await createTestUser('participant');
+      const survey = surveyService.createSurvey(
+        { title: 'Partial Progress', votingMethod: 'widerstand' },
+        hostId
+      );
+      surveyService.joinSurveyByInviteCode(survey.invite_code, participantId, null, null);
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      const optionId = addTestOption(survey.id, 'Option A');
+      const hostParticipantId = getParticipantId(survey.id, hostId);
+      addTestVote(survey.id, hostParticipantId, optionId, 1);
+
+      const progress = smService.getVotingProgress(survey.id);
+
+      expect(progress.votedCount).toBe(1);
+      expect(progress.participantCount).toBe(2);
+    });
+
+    it('should only count votes of the current voting round', async () => {
+      const hostId = await createTestUser('host');
+      const participantId = await createTestUser('participant');
+      const survey = surveyService.createSurvey(
+        { title: 'Round Progress', votingMethod: 'widerstand' },
+        hostId
+      );
+      surveyService.joinSurveyByInviteCode(survey.invite_code, participantId, null, null);
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      const optionA = addTestOption(survey.id, 'Option A');
+      const optionB = addTestOption(survey.id, 'Option B');
+      const hostParticipantId = getParticipantId(survey.id, hostId);
+      const participantPartId = getParticipantId(survey.id, participantId);
+
+      // Both voted in round 1, only the host voted in round 2 (current round)
+      addTestVote(survey.id, hostParticipantId, optionA, 1);
+      addTestVote(survey.id, participantPartId, optionA, 1);
+      addTestVote(survey.id, hostParticipantId, optionB, 2);
+
+      const progress = smService.getVotingProgress(survey.id);
+
+      expect(progress.votedCount).toBe(1);
+      expect(progress.participantCount).toBe(2);
     });
   });
 

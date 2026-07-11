@@ -206,6 +206,13 @@ export class SurveyController {
     try {
       const surveyId = req.params.id as string;
       const info = stateMachineService.getTransitionInfo(surveyId);
+
+      // Voting progress is management information – only host/co-host receive it
+      const role = req.surveyParticipant?.role;
+      if (role !== 'host' && role !== 'co_host') {
+        delete info.votingProgress;
+      }
+
       res.json(info);
     } catch (error) {
       next(error);

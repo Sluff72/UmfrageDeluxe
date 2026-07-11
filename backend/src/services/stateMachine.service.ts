@@ -25,6 +25,11 @@ export interface GuardResult {
   warning?: string;
 }
 
+export interface VotingProgress {
+  votedCount: number;
+  participantCount: number;
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -68,24 +73,12 @@ export class StateMachineService {
 
     // --- abstimmen → einwand_integration ---
     if (survey.status === 'abstimmen' && targetStatus === 'einwand_integration') {
-      const participantCount = database
-        .prepare('SELECT COUNT(*) as count FROM survey_participants WHERE survey_id = ?')
-        .get(survey.id) as { count: number };
+      const { votedCount, participantCount } = this.getVotingProgress(survey.id);
 
-      const currentRound = this.getCurrentVotingRound(survey.id);
-
-      const voterCount = database
-        .prepare(
-          `SELECT COUNT(DISTINCT participant_id) as count
-           FROM votes
-           WHERE survey_id = ? AND voting_round = ?`
-        )
-        .get(survey.id, currentRound) as { count: number };
-
-      if (voterCount.count < participantCount.count) {
+      if (votedCount < participantCount) {
         return {
           allowed: true,
-          warning: `Nicht alle Teilnehmer haben abgestimmt (${voterCount.count}/${participantCount.count})`,
+          warning: `Nicht alle Teilnehmer haben abgestimmt (${votedCount}/${participantCount})`,
         };
       }
       return { allowed: true };
@@ -211,7 +204,34 @@ export class StateMachineService {
   }
 
   /**
+   * Returns how many participants have voted in the current round.
+   * Counts distinct voters, so partial submissions across options count once.
+   */
+  getVotingProgress(surveyId: string): VotingProgress {
+    const database = getDatabase();
+    const currentRound = this.getCurrentVotingRound(surveyId);
+
+    const participantCount = database
+      .prepare('SELECT COUNT(*) as count FROM survey_participants WHERE survey_id = ?')
+      .get(surveyId) as { count: number };
+
+    const voterCount = database
+      .prepare(
+        `SELECT COUNT(DISTINCT participant_id) as count
+         FROM votes
+         WHERE survey_id = ? AND voting_round = ?`
+      )
+      .get(surveyId, currentRound) as { count: number };
+
+    return {
+      votedCount: voterCount.count,
+      participantCount: participantCount.count,
+    };
+  }
+
+  /**
    * Returns summary info for the frontend to render the PhaseController.
+   * votingProgress is only included during the voting phase.
    */
   getTransitionInfo(surveyId: string): {
     currentStatus: SurveyStatus;
@@ -222,6 +242,7 @@ export class StateMachineService {
       warning?: string;
     }>;
     votingRound: number;
+    votingProgress?: VotingProgress;
   } {
     const survey = surveyService.getSurveyById(surveyId);
     const validTargets = VALID_TRANSITIONS[survey.status] ?? [];
@@ -240,6 +261,9 @@ export class StateMachineService {
       currentStatus: survey.status,
       availableTransitions,
       votingRound: this.getCurrentVotingRound(surveyId),
+      ...(survey.status === 'abstimmen'
+        ? { votingProgress: this.getVotingProgress(surveyId) }
+        : {}),
     };
   }
 
