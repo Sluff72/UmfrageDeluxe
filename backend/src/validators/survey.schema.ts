@@ -24,6 +24,7 @@ export const createSurveySchema = z.object({
     .max(10, 'Max points per option must be at most 10')
     .optional(),
   allowAnonymous: z.boolean().optional(),
+  anonymousVoting: z.boolean().optional(),
 });
 
 export const updateSurveySchema = z.object({
@@ -51,6 +52,7 @@ export const updateSurveySchema = z.object({
     .max(10)
     .optional(),
   allowAnonymous: z.boolean().optional(),
+  anonymousVoting: z.boolean().optional(),
 });
 
 const importOptionSchema = z.object({

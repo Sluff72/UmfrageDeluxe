@@ -19,7 +19,8 @@ export interface Survey {
   w_max: number | null;
   max_points_per_option: number | null;
   invite_code: string;
-  allow_anonymous: number; // SQLite boolean
+  allow_anonymous: number; // SQLite boolean – anonymous participants may join
+  anonymous_voting: number; // SQLite boolean – votes are anonymous (no per-name results)
   is_archived: number;     // SQLite boolean
   current_voting_round: number;
   auto_transition_rules: string | null;
@@ -39,6 +40,7 @@ export interface CreateSurveyInput {
   wMax?: number;
   maxPointsPerOption?: number;
   allowAnonymous?: boolean;
+  anonymousVoting?: boolean;
 }
 
 export interface BulkImportOptionInput {
@@ -57,4 +59,5 @@ export interface UpdateSurveyInput {
   wMax?: number;
   maxPointsPerOption?: number;
   allowAnonymous?: boolean;
+  anonymousVoting?: boolean;
 }

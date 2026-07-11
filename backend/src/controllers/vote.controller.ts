@@ -68,6 +68,17 @@ export class VoteController {
       next(error);
     }
   }
+
+  async getResultsByParticipant(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const surveyId = req.params.id as string;
+      const results = voteService.getResultsByParticipant(surveyId);
+
+      res.json({ results });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const voteController = new VoteController();

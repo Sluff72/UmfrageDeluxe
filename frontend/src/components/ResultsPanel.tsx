@@ -13,7 +13,12 @@ import {
 import { api } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { ResultsPanelSkeleton } from "@/components/Skeleton";
-import type { VotingMethod, SurveyStatus, ObjectionStatus } from "@/types/survey";
+import type {
+  VotingMethod,
+  SurveyStatus,
+  ObjectionStatus,
+  ParticipantResult,
+} from "@/types/survey";
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -40,6 +45,8 @@ interface ResultsPanelProps {
   votingMethod: VotingMethod;
   surveyStatus: SurveyStatus;
   canManage: boolean;
+  /** false = non-anonymous survey: results can also be viewed per participant */
+  anonymousVoting: boolean;
   onObjectionChange?: () => void;
   /** Bumped externally (e.g. by socket events) to trigger a re-fetch */
   revision?: number;
@@ -67,12 +74,19 @@ export default function ResultsPanel({
   votingMethod,
   surveyStatus,
   canManage,
+  anonymousVoting,
   onObjectionChange,
   revision = 0,
 }: ResultsPanelProps) {
   const [results, setResults] = useState<VoteResultWithObjections[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Per-participant view (only for non-anonymous surveys)
+  const [view, setView] = useState<"gesamt" | "teilnehmer">("gesamt");
+  const [participantResults, setParticipantResults] = useState<
+    ParticipantResult[]
+  >([]);
 
   // Objection form state
   const [activeOptionId, setActiveOptionId] = useState<string | null>(null);
@@ -94,12 +108,19 @@ export default function ResultsPanel({
         `/api/surveys/${surveyId}/results`
       );
       setResults(data.results);
+
+      if (!anonymousVoting) {
+        const byParticipant = await api.get<{ results: ParticipantResult[] }>(
+          `/api/surveys/${surveyId}/results/by-participant`
+        );
+        setParticipantResults(byParticipant.results);
+      }
     } catch {
       setError("Ergebnisse konnten nicht geladen werden");
     } finally {
       setIsLoading(false);
     }
-  }, [surveyId]);
+  }, [surveyId, anonymousVoting]);
 
   useEffect(() => {
     fetchResults();
@@ -233,7 +254,37 @@ export default function ResultsPanel({
         )}
       </div>
 
-      {isObjectionPhase && (
+      {/* View toggle – only for non-anonymous surveys */}
+      {!anonymousVoting && (
+        <div
+          className="mb-4 flex gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800"
+          role="group"
+          aria-label="Ergebnisansicht wählen"
+        >
+          {(
+            [
+              ["gesamt", "Gesamt"],
+              ["teilnehmer", "Nach Teilnehmern"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setView(key)}
+              aria-pressed={view === key}
+              className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                view === key
+                  ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-zinc-100"
+                  : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isObjectionPhase && view === "gesamt" && (
         <p className="mb-4 text-sm text-zinc-400 dark:text-zinc-500">
           Klicke auf eine Option, um einen Einwand zu formulieren: Was brauchst
           du, um weniger Widerstand zu haben?
@@ -244,15 +295,28 @@ export default function ResultsPanel({
         <p className="mb-4 text-sm text-red-500 dark:text-red-400">{error}</p>
       )}
 
-      {/* Chart */}
-      {isResistance ? (
-        <ResistanceChart results={results} />
-      ) : (
-        <MehrheitChart results={results} />
+      {/* Per-participant table (non-anonymous surveys only) */}
+      {view === "teilnehmer" && !anonymousVoting && (
+        <ParticipantResultsTable
+          participantResults={participantResults}
+          options={results.map((r) => ({
+            id: r.option_id,
+            title: r.option_title,
+          }))}
+          isResistance={isResistance}
+        />
       )}
 
+      {/* Chart */}
+      {view === "gesamt" &&
+        (isResistance ? (
+          <ResistanceChart results={results} />
+        ) : (
+          <MehrheitChart results={results} />
+        ))}
+
       {/* Ranking with integrated objections */}
-      <div className="mt-6 space-y-3">
+      <div className={view === "gesamt" ? "mt-6 space-y-3" : "hidden"}>
         {(isResistance
           ? results
           : [...results].sort(
@@ -465,7 +529,7 @@ export default function ResultsPanel({
       </div>
 
       {/* Legend */}
-      <div className="mt-4">
+      <div className={view === "gesamt" ? "mt-4" : "hidden"}>
         {isResistance ? (
           <p className="text-center text-xs text-zinc-400 dark:text-zinc-500">
             Niedrigerer Widerstand = besserer Konsens. Sortiert vom geringsten
@@ -484,6 +548,97 @@ export default function ResultsPanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ── Per-participant table ─────────────────────────────────────── */
+
+function ParticipantResultsTable({
+  participantResults,
+  options,
+  isResistance,
+}: {
+  participantResults: ParticipantResult[];
+  options: Array<{ id: string; title: string }>;
+  isResistance: boolean;
+}) {
+  if (participantResults.length === 0) {
+    return (
+      <p className="py-8 text-center text-sm text-zinc-400 dark:text-zinc-500">
+        Noch keine Stimmen in dieser Runde.
+      </p>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[480px] text-sm">
+        <thead>
+          <tr className="border-b border-zinc-200 dark:border-zinc-700">
+            <th className="py-2 pr-4 text-left font-medium text-zinc-500 dark:text-zinc-400">
+              Teilnehmer
+            </th>
+            {options.map((option) => (
+              <th
+                key={option.id}
+                className="max-w-[140px] px-2 py-2 text-center font-medium text-zinc-500 dark:text-zinc-400"
+                title={option.title}
+              >
+                <span className="block truncate">{option.title}</span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {participantResults.map((participant) => {
+            const valueByOption = new Map(
+              participant.votes.map((vote) => [vote.option_id, vote.value])
+            );
+            return (
+              <tr
+                key={participant.participant_id}
+                className="border-b border-zinc-100 last:border-b-0 dark:border-zinc-800"
+              >
+                <td className="max-w-[160px] truncate py-2.5 pr-4 font-medium text-zinc-900 dark:text-zinc-100">
+                  {participant.participant_name}
+                </td>
+                {options.map((option) => {
+                  const value = valueByOption.get(option.id);
+                  return (
+                    <td key={option.id} className="px-2 py-2.5 text-center">
+                      {value === undefined ? (
+                        <span className="text-zinc-300 dark:text-zinc-600">
+                          –
+                        </span>
+                      ) : isResistance ? (
+                        <span
+                          className={`font-semibold ${getResistanceTextColor(value)}`}
+                        >
+                          {value}
+                        </span>
+                      ) : value === 1 ? (
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          ✓
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-red-500 dark:text-red-400">
+                          ✗
+                        </span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <p className="mt-3 text-center text-xs text-zinc-400 dark:text-zinc-500">
+        {isResistance
+          ? "Widerstandswerte pro Teilnehmer (0 = kein Widerstand, 10 = maximaler Widerstand)."
+          : "Stimmen pro Teilnehmer (✓ = Zustimmung, ✗ = Ablehnung)."}
+      </p>
     </div>
   );
 }

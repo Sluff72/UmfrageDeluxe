@@ -37,3 +37,15 @@ export interface ObjectionWithAuthor {
 export interface VoteResultWithObjections extends VoteResult {
   objections: ObjectionWithAuthor[];
 }
+
+export interface ParticipantVote {
+  option_id: string;
+  option_title: string;
+  value: number;
+}
+
+export interface ParticipantResult {
+  participant_id: string;
+  participant_name: string;
+  votes: ParticipantVote[];
+}
