@@ -46,6 +46,11 @@ function setSurveyStatus(surveyId: string, status: string): void {
   db.prepare('UPDATE surveys SET status = ? WHERE id = ?').run(status, surveyId);
 }
 
+function setVotingRound(surveyId: string, round: number): void {
+  const db = getDatabase();
+  db.prepare('UPDATE surveys SET current_voting_round = ? WHERE id = ?').run(round, surveyId);
+}
+
 function getParticipantId(surveyId: string, userId: string): string {
   const db = getDatabase();
   const row = db
@@ -213,6 +218,41 @@ describe('VoteService', () => {
       // Verify old votes are gone by checking total vote count
       const myVotes = service.getMyVotes(survey.id, participantId);
       expect(myVotes).toHaveLength(2);
+    });
+
+    it('should keep previous-round votes intact when voting in a new round', async () => {
+      const userId = await createTestUser();
+      const survey = createTestSurvey(userId, 'widerstand');
+      setSurveyStatus(survey.id, 'optionen_sammeln');
+      const participantId = getParticipantId(survey.id, userId);
+
+      const optionA = addTestOption(survey.id, participantId, 'Option A');
+
+      setSurveyStatus(survey.id, 'abstimmen');
+
+      // Round 1 vote, then the re-vote transition advances the round
+      service.submitVotes(survey.id, [{ optionId: optionA.id, value: 3 }], participantId);
+      setVotingRound(survey.id, 2);
+
+      // Round 2 vote must not overwrite the round 1 vote
+      const roundTwoVotes = service.submitVotes(
+        survey.id,
+        [{ optionId: optionA.id, value: 8 }],
+        participantId
+      );
+      expect(roundTwoVotes[0].voting_round).toBe(2);
+
+      const db = getDatabase();
+      const allVotes = db
+        .prepare(
+          'SELECT value, voting_round FROM votes WHERE survey_id = ? ORDER BY voting_round ASC'
+        )
+        .all(survey.id);
+
+      expect(allVotes).toEqual([
+        { value: 3, voting_round: 1 },
+        { value: 8, voting_round: 2 },
+      ]);
     });
 
     it('should reject when survey is not in abstimmen phase', async () => {
@@ -639,14 +679,14 @@ describe('VoteService', () => {
         participantId
       );
 
-      // Manually insert votes for round 2 to simulate a second round
+      // Simulate a second round: insert a round-2 vote and advance the survey round
       const db = getDatabase();
       db.prepare(
         `INSERT INTO votes (survey_id, option_id, participant_id, value, voting_round)
          VALUES (?, ?, ?, ?, 2)`
       ).run(survey.id, optionA.id, participantId, 1);
+      setVotingRound(survey.id, 2);
 
-      // getCurrentVotingRound should now return 2
       const myVotes = service.getMyVotes(survey.id, participantId);
 
       // Should only return the round-2 vote (1 vote), not the round-1 votes
@@ -933,18 +973,8 @@ describe('VoteService', () => {
 
       expect(service.hasVoted(survey.id, participantId)).toBe(true);
 
-      // Simulate a new round by inserting a vote for round 2 from another participant
-      // This makes getCurrentVotingRound return 2
-      const memberId = await createTestUser('member');
-      const surveyService = new SurveyService();
-      surveyService.joinSurveyByInviteCode(survey.invite_code, memberId, null, null);
-      const memberParticipantId = getParticipantId(survey.id, memberId);
-
-      const db = getDatabase();
-      db.prepare(
-        `INSERT INTO votes (survey_id, option_id, participant_id, value, voting_round)
-         VALUES (?, ?, ?, ?, 2)`
-      ).run(survey.id, optionA.id, memberParticipantId, 1);
+      // Simulate a new round by advancing the survey's current round
+      setVotingRound(survey.id, 2);
 
       // Original participant has not voted in round 2
       expect(service.hasVoted(survey.id, participantId)).toBe(false);

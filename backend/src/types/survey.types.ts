@@ -21,6 +21,7 @@ export interface Survey {
   invite_code: string;
   allow_anonymous: number; // SQLite boolean
   is_archived: number;     // SQLite boolean
+  current_voting_round: number;
   auto_transition_rules: string | null;
   created_by: string;
   created_at: string;

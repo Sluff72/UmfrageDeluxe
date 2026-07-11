@@ -144,13 +144,16 @@ export class StateMachineService {
     const previousStatus = survey.status;
     const database = getDatabase();
 
-    // Special handling: Re-vote increments voting_round
+    // Special handling: Re-vote starts a new round so previous results stay
+    // intact as history, and unresolved objections are closed for the new round.
     if (survey.status === 'einwand_integration' && targetStatus === 'abstimmen') {
-      const currentRound = this.getCurrentVotingRound(surveyId);
-      // We don't store voting_round on the survey itself – it's derived from
-      // MAX(voting_round) in the votes table. We insert a marker row or rely on
-      // the next vote submission to use currentRound + 1. Instead, we reset
-      // objection statuses for the new round.
+      database
+        .prepare(
+          `UPDATE surveys SET current_voting_round = current_voting_round + 1
+           WHERE id = ?`
+        )
+        .run(surveyId);
+
       database
         .prepare(
           `UPDATE objections SET status = 'dismissed'
@@ -190,17 +193,12 @@ export class StateMachineService {
   }
 
   /**
-   * Returns the current voting round for a survey (1-based).
-   * If no votes exist yet, returns 1.
+   * Returns the current voting round for a survey (1-based). The round is
+   * stored on the survey and incremented by the re-vote transition.
    */
   getCurrentVotingRound(surveyId: string): number {
-    const database = getDatabase();
-
-    const result = database
-      .prepare('SELECT MAX(voting_round) as round FROM votes WHERE survey_id = ?')
-      .get(surveyId) as { round: number | null };
-
-    return result.round ?? 1;
+    const survey = surveyService.getSurveyById(surveyId);
+    return survey.current_voting_round;
   }
 
   /**
