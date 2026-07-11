@@ -442,7 +442,7 @@ export default function SurveyDetailPage() {
                       Umfrage archivieren
                     </button>
                   )}
-                  {isHost && survey.is_archived && (
+                  {isHost && survey.is_archived === 1 && (
                     <div className="rounded-lg bg-zinc-100 px-4 py-2 text-center text-sm text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                       Archiviert
                     </div>
