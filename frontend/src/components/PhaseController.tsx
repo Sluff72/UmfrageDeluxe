@@ -156,15 +156,14 @@ export default function PhaseController({
       {/* Voting progress – only delivered to host/co-host during abstimmen */}
       {transitionInfo.currentStatus === "abstimmen" &&
         transitionInfo.votingProgress && (
-          <div className="mb-4">
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="text-zinc-500 dark:text-zinc-400">
+          <div className="mb-4 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-800/60">
+            <div className="mb-2 flex items-baseline justify-between gap-2">
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
                 Abstimmungsfortschritt
               </span>
-              <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                {transitionInfo.votingProgress.votedCount} von{" "}
-                {transitionInfo.votingProgress.participantCount} haben
-                abgestimmt
+              <span className="text-xs font-semibold tabular-nums text-zinc-700 dark:text-zinc-200">
+                {transitionInfo.votingProgress.votedCount}/
+                {transitionInfo.votingProgress.participantCount}
               </span>
             </div>
             <div
@@ -188,6 +187,10 @@ export default function PhaseController({
                 }}
               />
             </div>
+            <p className="mt-2 text-center text-xs text-zinc-500 dark:text-zinc-400">
+              {transitionInfo.votingProgress.votedCount} von{" "}
+              {transitionInfo.votingProgress.participantCount} haben abgestimmt
+            </p>
           </div>
         )}
 
