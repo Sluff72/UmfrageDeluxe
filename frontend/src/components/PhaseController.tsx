@@ -153,6 +153,44 @@ export default function PhaseController({
         </p>
       )}
 
+      {/* Voting progress – only delivered to host/co-host during abstimmen */}
+      {transitionInfo.currentStatus === "abstimmen" &&
+        transitionInfo.votingProgress && (
+          <div className="mb-4">
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-zinc-500 dark:text-zinc-400">
+                Abstimmungsfortschritt
+              </span>
+              <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                {transitionInfo.votingProgress.votedCount} von{" "}
+                {transitionInfo.votingProgress.participantCount} haben
+                abgestimmt
+              </span>
+            </div>
+            <div
+              className="h-2 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-700"
+              role="progressbar"
+              aria-label="Abstimmungsfortschritt"
+              aria-valuenow={transitionInfo.votingProgress.votedCount}
+              aria-valuemin={0}
+              aria-valuemax={transitionInfo.votingProgress.participantCount}
+            >
+              <div
+                className="h-full rounded-full bg-emerald-500 transition-all dark:bg-emerald-400"
+                style={{
+                  width: `${
+                    transitionInfo.votingProgress.participantCount > 0
+                      ? (transitionInfo.votingProgress.votedCount /
+                          transitionInfo.votingProgress.participantCount) *
+                        100
+                      : 0
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
       {/* Transition buttons (only for host/co-host) */}
       {canManage && transitionInfo.availableTransitions.length > 0 && (
         <div className="space-y-2">
