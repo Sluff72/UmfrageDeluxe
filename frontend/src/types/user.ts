@@ -3,6 +3,20 @@ export interface UserPublic {
   username: string;
   display_name: string | null;
   created_at: string;
+  is_admin: boolean;
+}
+
+/** User as listed in the admin user administration. */
+export interface UserAdministrationEntry {
+  id: string;
+  username: string;
+  display_name: string | null;
+  created_at: string;
+  last_login_at: string | null;
+  failed_login_attempts: number;
+  locked_until: string | null;
+  is_locked: boolean;
+  is_admin: boolean;
 }
 
 export interface AuthResponse {

@@ -2,13 +2,25 @@ import argon2 from 'argon2';
 import jwt from 'jsonwebtoken';
 import { getDatabase } from '../config/database';
 import { env } from '../config/env';
-import { ConflictError, UnauthorizedError } from '../utils/errors';
+import { AccountLockedError, ConflictError, UnauthorizedError } from '../utils/errors';
+import { LoginLockoutService, loginLockoutService } from './loginLockout.service';
+import {
+  UserAdministrationService,
+  userAdministrationService,
+} from './userAdministration.service';
 import type { User, UserPublic, JwtPayload } from '../types/user.types';
 import type { RegisterInput, LoginInput } from '../validators/auth.schema';
 
 const JWT_EXPIRATION = '24h';
 
+type UserProfileRow = Omit<UserPublic, 'is_admin'>;
+
 export class AuthService {
+  constructor(
+    private readonly loginLockout: LoginLockoutService = loginLockoutService,
+    private readonly userAdministration: UserAdministrationService = userAdministrationService
+  ) {}
+
   async registerUser(input: RegisterInput): Promise<UserPublic> {
     const database = getDatabase();
 
@@ -34,9 +46,9 @@ export class AuthService {
         input.username,
         passwordHash,
         input.displayName ?? null
-      ) as UserPublic;
+      ) as UserProfileRow;
 
-    return result;
+    return this.toUserPublic(result);
   }
 
   async loginUser(input: LoginInput): Promise<{ user: UserPublic; token: string }> {
@@ -50,32 +62,47 @@ export class AuthService {
       throw new UnauthorizedError('Invalid username or password');
     }
 
+    this.loginLockout.clearExpiredLock(user.id);
+    if (this.loginLockout.isAccountLocked(user.id)) {
+      throw new AccountLockedError();
+    }
+
     const isPasswordValid = await argon2.verify(user.password_hash, input.password);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedError('Invalid username or password');
+      const isNowLocked = this.loginLockout.recordFailedLoginAttempt(user.id);
+      throw isNowLocked
+        ? new AccountLockedError()
+        : new UnauthorizedError('Invalid username or password');
     }
+
+    this.loginLockout.recordSuccessfulLogin(user.id);
 
     const token = this.generateToken(user);
 
-    const userPublic: UserPublic = {
-      id: user.id,
-      username: user.username,
-      display_name: user.display_name,
-      created_at: user.created_at,
-    };
-
-    return { user: userPublic, token };
+    return { user: this.toUserPublic(user), token };
   }
 
   getUserById(userId: string): UserPublic | undefined {
     const database = getDatabase();
 
-    return database
+    const user = database
       .prepare(
         'SELECT id, username, display_name, created_at FROM users WHERE id = ?'
       )
-      .get(userId) as UserPublic | undefined;
+      .get(userId) as UserProfileRow | undefined;
+
+    return user ? this.toUserPublic(user) : undefined;
+  }
+
+  private toUserPublic(user: UserProfileRow): UserPublic {
+    return {
+      id: user.id,
+      username: user.username,
+      display_name: user.display_name,
+      created_at: user.created_at,
+      is_admin: this.userAdministration.isAdmin(user.username),
+    };
   }
 
   generateToken(user: Pick<User, 'id' | 'username'>): string {

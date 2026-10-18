@@ -11,6 +11,7 @@ services:
       - DATABASE_PATH=/data/umfrage.db
       - CORS_ORIGIN=http://localhost:3030
       - PORT=3029
+      - ADMIN_USERNAMES=${ADMIN_USERNAMES:-}
     volumes:
       - sqlite-data:/data
     restart: unless-stopped

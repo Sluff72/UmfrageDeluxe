@@ -6,6 +6,19 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/lib/api";
 
+const HTTP_STATUS_ACCOUNT_LOCKED = 423;
+const HTTP_STATUS_TOO_MANY_REQUESTS = 429;
+
+function describeLoginError(error: ApiError): string {
+  if (error.statusCode === HTTP_STATUS_ACCOUNT_LOCKED) {
+    return "Zu viele fehlgeschlagene Anmeldeversuche. Dieses Konto ist für 15 Minuten gesperrt – oder bis ein Admin es entsperrt.";
+  }
+  if (error.statusCode === HTTP_STATUS_TOO_MANY_REQUESTS) {
+    return "Zu viele Anmeldeversuche aus diesem Netzwerk. Bitte versuche es in ein paar Minuten erneut.";
+  }
+  return error.message;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -39,7 +52,7 @@ function LoginForm() {
       router.push(redirectTo);
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.message);
+        setError(describeLoginError(err));
       } else {
         setError("Ein unerwarteter Fehler ist aufgetreten");
       }

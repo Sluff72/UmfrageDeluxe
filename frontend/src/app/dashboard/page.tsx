@@ -72,6 +72,14 @@ export default function DashboardPage() {
             <span className="hidden text-sm text-zinc-600 sm:inline dark:text-zinc-400">
               {user.display_name || user.username}
             </span>
+            {user.is_admin && (
+              <Link
+                href="/admin/users"
+                className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Nutzerverwaltung
+              </Link>
+            )}
             <button
               onClick={logout}
               className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"

@@ -7,7 +7,15 @@
     "dashboard": "Übersicht",
     "login": "Anmelden",
     "register": "Registrieren",
-    "logout": "Abmelden"
+    "logout": "Abmelden",
+    "user_administration": "Nutzerverwaltung"
+  },
+  "admin": {
+    "users_title": "Nutzerverwaltung",
+    "unlock": "Entsperren",
+    "locked": "Gesperrt",
+    "active": "Aktiv",
+    "unlock_success": "Konto entsperrt"
   },
   "survey": {
     "status": {
