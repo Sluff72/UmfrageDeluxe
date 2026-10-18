@@ -57,7 +57,11 @@ class ApiClient {
       const errorBody = await response.json().catch(() => ({
         error: "Unknown error",
       }));
-      throw new ApiError(response.status, errorBody.error || "Request failed");
+      throw new ApiError(
+        response.status,
+        errorBody.error || "Request failed",
+        errorBody.code
+      );
     }
 
     if (response.status === 204) {
@@ -93,7 +97,9 @@ class ApiClient {
 export class ApiError extends Error {
   constructor(
     public readonly statusCode: number,
-    message: string
+    message: string,
+    /** Machine-readable error code from the backend, e.g. "ACCOUNT_LOCKED" */
+    public readonly code?: string
   ) {
     super(message);
     this.name = "ApiError";

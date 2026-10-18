@@ -19,4 +19,11 @@ adminRouter.post(
   (req, res, next) => adminController.unlockUser(req, res, next)
 );
 
+adminRouter.post(
+  '/admin/users/:userId/reset-password',
+  requireAuth,
+  requireAdmin,
+  (req, res, next) => adminController.resetPassword(req, res, next)
+);
+
 export { adminRouter };

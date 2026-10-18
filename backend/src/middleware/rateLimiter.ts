@@ -13,7 +13,7 @@ const REGISTER_WINDOW_MS = 60 * 60 * 1000;
 const MAX_REGISTRATIONS_PER_IP = 50;
 
 const GENERAL_WINDOW_MS = 60 * 1000;
-const MAX_REQUESTS_PER_IP = 100;
+const MAX_REQUESTS_PER_IP = 1000;
 
 export const authLoginLimiter = rateLimit({
   windowMs: LOGIN_WINDOW_MS,

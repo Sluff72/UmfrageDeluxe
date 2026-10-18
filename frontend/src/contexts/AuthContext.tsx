@@ -13,6 +13,7 @@ import type {
   AuthResponse,
   RegisterInput,
   LoginInput,
+  ChangePasswordInput,
 } from "@/types/user";
 
 interface AuthContextValue {
@@ -21,6 +22,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   login: (input: LoginInput) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
+  changePassword: (input: ChangePasswordInput) => Promise<void>;
   logout: () => void;
 }
 
@@ -60,6 +62,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(loginResponse.user);
   }, []);
 
+  const changePassword = useCallback(async (input: ChangePasswordInput) => {
+    const response = await api.post<AuthResponse>(
+      "/api/auth/change-password",
+      input
+    );
+    setUser(response.user);
+  }, []);
+
   const logout = useCallback(() => {
     setUser(null);
     api.post("/api/auth/logout").catch(() => {
@@ -74,9 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !!user,
       login,
       register,
+      changePassword,
       logout,
     }),
-    [user, isLoading, login, register, logout]
+    [user, isLoading, login, register, changePassword, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

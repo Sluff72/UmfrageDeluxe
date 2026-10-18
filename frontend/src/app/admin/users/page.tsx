@@ -6,9 +6,18 @@ import { useAuth } from "@/hooks/useAuth";
 import { api, ApiError } from "@/lib/api";
 import Header from "@/components/Header";
 import { useToast } from "@/components/Toast";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { UserAdministrationEntry } from "@/types/user";
 
 /** SQLite stores UTC timestamps as "YYYY-MM-DD HH:MM:SS" without zone. */
+interface TemporaryPasswordNotice {
+  username: string;
+  temporaryPassword: string;
+}
+
+const SECONDARY_BUTTON_CLASS_NAME =
+  "rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800";
+
 function formatSqliteTimestamp(timestamp: string | null): string {
   if (!timestamp) {
     return "–";
@@ -27,7 +36,11 @@ export default function UserAdministrationPage() {
   const [users, setUsers] = useState<UserAdministrationEntry[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [unlockingUserId, setUnlockingUserId] = useState<string | null>(null);
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [userPendingPasswordReset, setUserPendingPasswordReset] =
+    useState<UserAdministrationEntry | null>(null);
+  const [temporaryPasswordNotice, setTemporaryPasswordNotice] =
+    useState<TemporaryPasswordNotice | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -58,20 +71,60 @@ export default function UserAdministrationPage() {
     }
   }, [isLoading, user, router, fetchUsers]);
 
+  function replaceUserEntry(updatedUser: UserAdministrationEntry) {
+    setUsers((current) =>
+      current.map((entry) => (entry.id === updatedUser.id ? updatedUser : entry))
+    );
+  }
+
   async function handleUnlock(userToUnlock: UserAdministrationEntry) {
-    setUnlockingUserId(userToUnlock.id);
+    setBusyUserId(userToUnlock.id);
     try {
       const { user: unlockedUser } = await api.post<{ user: UserAdministrationEntry }>(
         `/api/admin/users/${userToUnlock.id}/unlock`
       );
-      setUsers((current) =>
-        current.map((entry) => (entry.id === unlockedUser.id ? unlockedUser : entry))
-      );
+      replaceUserEntry(unlockedUser);
       toast.success(`${unlockedUser.username} wurde entsperrt`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Entsperren fehlgeschlagen");
     } finally {
-      setUnlockingUserId(null);
+      setBusyUserId(null);
+    }
+  }
+
+  async function handleConfirmPasswordReset() {
+    const userToReset = userPendingPasswordReset;
+    setUserPendingPasswordReset(null);
+    if (!userToReset) {
+      return;
+    }
+
+    setBusyUserId(userToReset.id);
+    try {
+      const { user: resetUser, temporaryPassword } = await api.post<{
+        user: UserAdministrationEntry;
+        temporaryPassword: string;
+      }>(`/api/admin/users/${userToReset.id}/reset-password`);
+      replaceUserEntry(resetUser);
+      setTemporaryPasswordNotice({ username: resetUser.username, temporaryPassword });
+    } catch (err) {
+      toast.error(
+        err instanceof ApiError ? err.message : "Zurücksetzen fehlgeschlagen"
+      );
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
+  async function handleCopyTemporaryPassword() {
+    if (!temporaryPasswordNotice) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(temporaryPasswordNotice.temporaryPassword);
+      toast.success("Passwort kopiert");
+    } catch {
+      toast.error("Kopieren nicht möglich – bitte manuell markieren");
     }
   }
 
@@ -101,6 +154,14 @@ export default function UserAdministrationPage() {
           )}
         </div>
 
+        {temporaryPasswordNotice && (
+          <TemporaryPasswordPanel
+            notice={temporaryPasswordNotice}
+            onCopy={handleCopyTemporaryPassword}
+            onDismiss={() => setTemporaryPasswordNotice(null)}
+          />
+        )}
+
         {isLoadingUsers ? (
           <div className="text-zinc-500">Laden...</div>
         ) : loadError ? (
@@ -127,8 +188,9 @@ export default function UserAdministrationPage() {
                   <UserRow
                     key={entry.id}
                     entry={entry}
-                    isUnlocking={unlockingUserId === entry.id}
+                    isBusy={busyUserId === entry.id}
                     onUnlock={() => handleUnlock(entry)}
+                    onResetPassword={() => setUserPendingPasswordReset(entry)}
                   />
                 ))}
               </tbody>
@@ -136,17 +198,59 @@ export default function UserAdministrationPage() {
           </div>
         )}
       </main>
+
+      <ConfirmDialog
+        open={userPendingPasswordReset !== null}
+        title="Passwort zurücksetzen?"
+        message={`Das bisherige Passwort von ${userPendingPasswordReset?.username ?? ""} funktioniert danach nicht mehr. Du erhältst ein vorläufiges Passwort, das du weitergibst. Bei der nächsten Anmeldung muss ein neues Passwort vergeben werden.`}
+        confirmLabel="Zurücksetzen"
+        variant="danger"
+        onConfirm={handleConfirmPasswordReset}
+        onCancel={() => setUserPendingPasswordReset(null)}
+      />
+    </div>
+  );
+}
+
+interface TemporaryPasswordPanelProps {
+  notice: TemporaryPasswordNotice;
+  onCopy: () => void;
+  onDismiss: () => void;
+}
+
+function TemporaryPasswordPanel({ notice, onCopy, onDismiss }: TemporaryPasswordPanelProps) {
+  return (
+    <div
+      role="status"
+      className="mb-6 rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-950/40"
+    >
+      <p className="text-sm text-amber-900 dark:text-amber-200">
+        Vorläufiges Passwort für <strong>{notice.username}</strong>. Es wird nur jetzt
+        angezeigt – bitte notieren oder kopieren und weitergeben.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <code className="select-all rounded-lg bg-white px-3 py-1.5 font-mono text-base tracking-wider text-zinc-900 dark:bg-zinc-900 dark:text-zinc-50">
+          {notice.temporaryPassword}
+        </code>
+        <button onClick={onCopy} className={SECONDARY_BUTTON_CLASS_NAME}>
+          Kopieren
+        </button>
+        <button onClick={onDismiss} className={SECONDARY_BUTTON_CLASS_NAME}>
+          Schließen
+        </button>
+      </div>
     </div>
   );
 }
 
 interface UserRowProps {
   entry: UserAdministrationEntry;
-  isUnlocking: boolean;
+  isBusy: boolean;
   onUnlock: () => void;
+  onResetPassword: () => void;
 }
 
-function UserRow({ entry, isUnlocking, onUnlock }: UserRowProps) {
+function UserRow({ entry, isBusy, onUnlock, onResetPassword }: UserRowProps) {
   return (
     <tr className="text-zinc-700 dark:text-zinc-300">
       <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-50">
@@ -173,22 +277,28 @@ function UserRow({ entry, isUnlocking, onUnlock }: UserRowProps) {
             Aktiv
           </span>
         )}
+        {entry.must_change_password && (
+          <span className="ml-2 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+            Neues Passwort ausstehend
+          </span>
+        )}
         {!entry.is_locked && entry.failed_login_attempts > 0 && (
           <span className="ml-2 text-xs text-zinc-400">
             {entry.failed_login_attempts} Fehlversuch(e)
           </span>
         )}
       </td>
-      <td className="px-4 py-3 text-right">
-        {(entry.is_locked || entry.failed_login_attempts > 0) && (
-          <button
-            onClick={onUnlock}
-            disabled={isUnlocking}
-            className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-          >
-            {isUnlocking ? "Entsperren..." : "Entsperren"}
+      <td className="px-4 py-3">
+        <div className="flex justify-end gap-2 whitespace-nowrap">
+          {(entry.is_locked || entry.failed_login_attempts > 0) && (
+            <button onClick={onUnlock} disabled={isBusy} className={SECONDARY_BUTTON_CLASS_NAME}>
+              Entsperren
+            </button>
+          )}
+          <button onClick={onResetPassword} disabled={isBusy} className={SECONDARY_BUTTON_CLASS_NAME}>
+            Passwort zurücksetzen
           </button>
-        )}
+        </div>
       </td>
     </tr>
   );

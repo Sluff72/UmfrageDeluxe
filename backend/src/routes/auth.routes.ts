@@ -3,7 +3,7 @@ import { authController } from '../controllers/auth.controller';
 import { validate } from '../middleware/validate';
 import { requireAuth } from '../middleware/auth';
 import { authLoginLimiter, authRegisterLimiter } from '../middleware/rateLimiter';
-import { registerSchema, loginSchema } from '../validators/auth.schema';
+import { registerSchema, loginSchema, changePasswordSchema } from '../validators/auth.schema';
 
 const authRouter = Router();
 
@@ -19,6 +19,15 @@ authRouter.post(
   authLoginLimiter,
   validate(loginSchema),
   (req, res, next) => authController.login(req, res, next)
+);
+
+// Unauthenticated on purpose: users with a temporary password get no
+// session until they have chosen a new one.
+authRouter.post(
+  '/auth/change-password',
+  authLoginLimiter,
+  validate(changePasswordSchema),
+  (req, res, next) => authController.changePassword(req, res, next)
 );
 
 authRouter.get(

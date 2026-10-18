@@ -11,6 +11,7 @@ import { runPositionMigration } from './db/migrations/002_add_position_to_option
 import { runCurrentVotingRoundMigration } from './db/migrations/003_add_current_voting_round';
 import { runAnonymousVotingMigration } from './db/migrations/004_add_anonymous_voting';
 import { runLoginLockoutMigration } from './db/migrations/005_add_login_lockout';
+import { runMustChangePasswordMigration } from './db/migrations/006_add_must_change_password';
 import { setupSocketServer } from './socket/index';
 import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
@@ -44,6 +45,7 @@ runPositionMigration(database);
 runCurrentVotingRoundMigration(database);
 runAnonymousVotingMigration(database);
 runLoginLockoutMigration(database);
+runMustChangePasswordMigration(database);
 console.log('Database initialized and migrations applied.');
 
 // Routes

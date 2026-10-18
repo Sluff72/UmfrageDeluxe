@@ -17,6 +17,7 @@ export interface UserAdministrationEntry {
   locked_until: string | null;
   is_locked: boolean;
   is_admin: boolean;
+  must_change_password: boolean;
 }
 
 export interface AuthResponse {
@@ -32,4 +33,10 @@ export interface RegisterInput {
 export interface LoginInput {
   username: string;
   password: string;
+}
+
+export interface ChangePasswordInput {
+  username: string;
+  currentPassword: string;
+  newPassword: string;
 }

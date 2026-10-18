@@ -8,6 +8,7 @@ export interface User {
   failed_login_attempts: number;
   locked_until: string | null;
   last_login_at: string | null;
+  must_change_password: number;
 }
 
 export interface UserPublic {
@@ -29,6 +30,7 @@ export interface UserAdministrationEntry {
   locked_until: string | null;
   is_locked: boolean;
   is_admin: boolean;
+  must_change_password: boolean;
 }
 
 export interface JwtPayload {

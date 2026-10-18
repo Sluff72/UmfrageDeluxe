@@ -1,16 +1,21 @@
 import { getDatabase } from '../config/database';
 import { env } from '../config/env';
 import { NotFoundError } from '../utils/errors';
+import { generateTemporaryPassword, hashPassword } from '../utils/password';
 import { LoginLockoutService, loginLockoutService } from './loginLockout.service';
 import type { UserAdministrationEntry } from '../types/user.types';
 
-type UserAdministrationRow = Omit<UserAdministrationEntry, 'is_locked' | 'is_admin'> & {
+type UserAdministrationRow = Omit<
+  UserAdministrationEntry,
+  'is_locked' | 'is_admin' | 'must_change_password'
+> & {
   is_locked: number;
+  must_change_password: number;
 };
 
 const USER_ADMINISTRATION_COLUMNS = `
   id, username, display_name, created_at, last_login_at,
-  failed_login_attempts, locked_until,
+  failed_login_attempts, locked_until, must_change_password,
   (locked_until IS NOT NULL AND locked_until > datetime('now')) AS is_locked
 `;
 
@@ -49,6 +54,31 @@ export class UserAdministrationService {
     return this.findUserOrThrow(userId);
   }
 
+  /**
+   * Replaces the user's password with a random temporary one and returns it
+   * in plain text – this is the only moment it is visible. The user must set
+   * a new password at the next login. Also lifts any login lock.
+   */
+  async resetPassword(
+    userId: string
+  ): Promise<{ user: UserAdministrationEntry; temporaryPassword: string }> {
+    this.findUserOrThrow(userId);
+
+    const temporaryPassword = generateTemporaryPassword();
+    const temporaryPasswordHash = await hashPassword(temporaryPassword);
+
+    getDatabase()
+      .prepare(
+        `UPDATE users
+         SET password_hash = ?, must_change_password = 1, updated_at = datetime('now')
+         WHERE id = ?`
+      )
+      .run(temporaryPasswordHash, userId);
+    this.loginLockout.unlockAccount(userId);
+
+    return { user: this.findUserOrThrow(userId), temporaryPassword };
+  }
+
   private findUserOrThrow(userId: string): UserAdministrationEntry {
     const row = getDatabase()
       .prepare(`SELECT ${USER_ADMINISTRATION_COLUMNS} FROM users WHERE id = ?`)
@@ -65,6 +95,7 @@ export class UserAdministrationService {
     return {
       ...row,
       is_locked: row.is_locked === 1,
+      must_change_password: row.must_change_password === 1,
       is_admin: this.isAdmin(row.username),
     };
   }

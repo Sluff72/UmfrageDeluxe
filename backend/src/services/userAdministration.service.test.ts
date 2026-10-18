@@ -3,7 +3,13 @@ import { AuthService } from './auth.service';
 import { LoginLockoutService, MAX_FAILED_LOGIN_ATTEMPTS } from './loginLockout.service';
 import { UserAdministrationService } from './userAdministration.service';
 import { getDatabase } from '../config/database';
-import { AccountLockedError, NotFoundError } from '../utils/errors';
+import {
+  AccountLockedError,
+  NotFoundError,
+  PasswordChangeRequiredError,
+  UnauthorizedError,
+} from '../utils/errors';
+import { changePasswordSchema } from '../validators/auth.schema';
 
 describe('UserAdministrationService', () => {
   const adminUsername = 'admin';
@@ -95,6 +101,84 @@ describe('UserAdministrationService', () => {
 
     it('should throw NotFoundError for an unknown user', () => {
       expect(() => userAdministration.unlockUser('nonexistent-id')).toThrow(NotFoundError);
+    });
+  });
+
+  describe('resetPassword', () => {
+    const newPassword = 'my-new-password-42';
+
+    it('should return a temporary password and invalidate the old one', async () => {
+      const alice = await authService.registerUser({ username: 'alice', password });
+
+      const { temporaryPassword, user } = await userAdministration.resetPassword(alice.id);
+
+      expect(temporaryPassword).toMatch(/^[A-Za-z0-9]{12}$/);
+      expect(user.must_change_password).toBe(true);
+      await expect(authService.loginUser({ username: 'alice', password })).rejects.toThrow(
+        UnauthorizedError
+      );
+    });
+
+    it('should require a new password before login succeeds', async () => {
+      const alice = await authService.registerUser({ username: 'alice', password });
+      const { temporaryPassword } = await userAdministration.resetPassword(alice.id);
+
+      await expect(
+        authService.loginUser({ username: 'alice', password: temporaryPassword })
+      ).rejects.toThrow(PasswordChangeRequiredError);
+
+      const changed = await authService.changePassword({
+        username: 'alice',
+        currentPassword: temporaryPassword,
+        newPassword,
+      });
+      expect(changed.token).toBeDefined();
+
+      const result = await authService.loginUser({ username: 'alice', password: newPassword });
+      expect(result.user.username).toBe('alice');
+      await expect(
+        authService.loginUser({ username: 'alice', password: temporaryPassword })
+      ).rejects.toThrow(UnauthorizedError);
+      expect(userAdministration.listUsers()[0].must_change_password).toBe(false);
+    });
+
+    it('should lift an existing login lock', async () => {
+      const alice = await authService.registerUser({ username: 'alice', password });
+      await lockAccount('alice');
+
+      const { user } = await userAdministration.resetPassword(alice.id);
+
+      expect(user.is_locked).toBe(false);
+    });
+
+    it('should reject a password change with a wrong current password', async () => {
+      const alice = await authService.registerUser({ username: 'alice', password });
+      await userAdministration.resetPassword(alice.id);
+
+      await expect(
+        authService.changePassword({
+          username: 'alice',
+          currentPassword: 'not-the-temporary-one',
+          newPassword,
+        })
+      ).rejects.toThrow(UnauthorizedError);
+    });
+
+    it('should throw NotFoundError for an unknown user', async () => {
+      await expect(userAdministration.resetPassword('nonexistent-id')).rejects.toThrow(
+        NotFoundError
+      );
+    });
+  });
+
+  describe('changePasswordSchema', () => {
+    it('should reject a new password equal to the current one', () => {
+      const result = changePasswordSchema.safeParse({
+        username: 'alice',
+        currentPassword: 'same-password-1',
+        newPassword: 'same-password-1',
+      });
+      expect(result.success).toBe(false);
     });
   });
 });
