@@ -1,15 +1,24 @@
-import argon2 from 'argon2';
 import jwt from 'jsonwebtoken';
 import { getDatabase } from '../config/database';
 import { env } from '../config/env';
-import { AccountLockedError, ConflictError, UnauthorizedError } from '../utils/errors';
+import {
+  AccountLockedError,
+  ConflictError,
+  PasswordChangeRequiredError,
+  UnauthorizedError,
+} from '../utils/errors';
+import { hashPassword, verifyPassword } from '../utils/password';
 import { LoginLockoutService, loginLockoutService } from './loginLockout.service';
 import {
   UserAdministrationService,
   userAdministrationService,
 } from './userAdministration.service';
 import type { User, UserPublic, JwtPayload } from '../types/user.types';
-import type { RegisterInput, LoginInput } from '../validators/auth.schema';
+import type {
+  RegisterInput,
+  LoginInput,
+  ChangePasswordInput,
+} from '../validators/auth.schema';
 
 const JWT_EXPIRATION = '24h';
 
@@ -32,9 +41,7 @@ export class AuthService {
       throw new ConflictError('Username is already taken');
     }
 
-    const passwordHash = await argon2.hash(input.password, {
-      type: argon2.argon2id,
-    });
+    const passwordHash = await hashPassword(input.password);
 
     const result = database
       .prepare(
@@ -52,11 +59,41 @@ export class AuthService {
   }
 
   async loginUser(input: LoginInput): Promise<{ user: UserPublic; token: string }> {
-    const database = getDatabase();
+    const user = await this.verifyCredentials(input.username, input.password);
 
-    const user = database
+    if (user.must_change_password) {
+      throw new PasswordChangeRequiredError();
+    }
+
+    return this.completeLogin(user);
+  }
+
+  /**
+   * Sets a new password after verifying the current one. Used when an admin
+   * reset the password to a temporary one. Logs the user in on success.
+   */
+  async changePassword(
+    input: ChangePasswordInput
+  ): Promise<{ user: UserPublic; token: string }> {
+    const user = await this.verifyCredentials(input.username, input.currentPassword);
+    const newPasswordHash = await hashPassword(input.newPassword);
+
+    getDatabase()
+      .prepare(
+        `UPDATE users
+         SET password_hash = ?, must_change_password = 0, updated_at = datetime('now')
+         WHERE id = ?`
+      )
+      .run(newPasswordHash, user.id);
+
+    return this.completeLogin(user);
+  }
+
+  /** Checks username/password and applies the per-account lockout. */
+  private async verifyCredentials(username: string, password: string): Promise<User> {
+    const user = getDatabase()
       .prepare('SELECT * FROM users WHERE username = ?')
-      .get(input.username) as User | undefined;
+      .get(username) as User | undefined;
 
     if (!user) {
       throw new UnauthorizedError('Invalid username or password');
@@ -67,7 +104,7 @@ export class AuthService {
       throw new AccountLockedError();
     }
 
-    const isPasswordValid = await argon2.verify(user.password_hash, input.password);
+    const isPasswordValid = await verifyPassword(user.password_hash, password);
 
     if (!isPasswordValid) {
       const isNowLocked = this.loginLockout.recordFailedLoginAttempt(user.id);
@@ -76,10 +113,12 @@ export class AuthService {
         : new UnauthorizedError('Invalid username or password');
     }
 
+    return user;
+  }
+
+  private completeLogin(user: User): { user: UserPublic; token: string } {
     this.loginLockout.recordSuccessfulLogin(user.id);
-
     const token = this.generateToken(user);
-
     return { user: this.toUserPublic(user), token };
   }
 

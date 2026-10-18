@@ -15,7 +15,10 @@
     "unlock": "Entsperren",
     "locked": "Gesperrt",
     "active": "Aktiv",
-    "unlock_success": "Konto entsperrt"
+    "unlock_success": "Konto entsperrt",
+    "reset_password": "Passwort zurücksetzen",
+    "temporary_password": "Vorläufiges Passwort",
+    "password_change_pending": "Neues Passwort ausstehend"
   },
   "survey": {
     "status": {

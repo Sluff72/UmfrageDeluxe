@@ -20,6 +20,16 @@ export class AdminController {
       next(error);
     }
   }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.params.userId as string;
+      const { user, temporaryPassword } = await userAdministrationService.resetPassword(userId);
+      res.json({ user, temporaryPassword });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const adminController = new AdminController();

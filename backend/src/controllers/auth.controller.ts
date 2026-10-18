@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
 import { NotFoundError } from '../utils/errors';
-import type { RegisterInput, LoginInput } from '../validators/auth.schema';
+import type { RegisterInput, LoginInput, ChangePasswordInput } from '../validators/auth.schema';
+
+const AUTH_COOKIE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export class AuthController {
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -18,14 +20,18 @@ export class AuthController {
     try {
       const input: LoginInput = req.body;
       const { user, token } = await authService.loginUser(input);
+      this.setAuthCookie(res, token);
+      res.json({ user });
+    } catch (error) {
+      next(error);
+    }
+  }
 
-      res.cookie('token', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      });
-
+  async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const input: ChangePasswordInput = req.body;
+      const { user, token } = await authService.changePassword(input);
+      this.setAuthCookie(res, token);
       res.json({ user });
     } catch (error) {
       next(error);
@@ -45,6 +51,15 @@ export class AuthController {
     } catch (error) {
       next(error);
     }
+  }
+
+  private setAuthCookie(res: Response, token: string): void {
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: AUTH_COOKIE_MAX_AGE_MS,
+    });
   }
 
   async logout(_req: Request, res: Response): Promise<void> {

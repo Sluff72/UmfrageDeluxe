@@ -50,3 +50,10 @@ export class AccountLockedError extends AppError {
     this.name = 'AccountLockedError';
   }
 }
+
+export class PasswordChangeRequiredError extends AppError {
+  constructor(message = 'A new password must be set before logging in') {
+    super(message, 403, 'PASSWORD_CHANGE_REQUIRED');
+    this.name = 'PasswordChangeRequiredError';
+  }
+}
