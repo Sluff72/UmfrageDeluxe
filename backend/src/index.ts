@@ -10,6 +10,7 @@ import { runInitialMigration } from './db/migrations/001_initial';
 import { runPositionMigration } from './db/migrations/002_add_position_to_options';
 import { runCurrentVotingRoundMigration } from './db/migrations/003_add_current_voting_round';
 import { runAnonymousVotingMigration } from './db/migrations/004_add_anonymous_voting';
+import { runLoginLockoutMigration } from './db/migrations/005_add_login_lockout';
 import { setupSocketServer } from './socket/index';
 import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
@@ -17,6 +18,7 @@ import { surveyRouter } from './routes/survey.routes';
 import { optionRouter } from './routes/option.routes';
 import { voteRouter } from './routes/vote.routes';
 import { objectionRouter } from './routes/objection.routes';
+import { adminRouter } from './routes/admin.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { generalLimiter } from './middleware/rateLimiter';
 
@@ -41,6 +43,7 @@ runInitialMigration(database);
 runPositionMigration(database);
 runCurrentVotingRoundMigration(database);
 runAnonymousVotingMigration(database);
+runLoginLockoutMigration(database);
 console.log('Database initialized and migrations applied.');
 
 // Routes
@@ -50,6 +53,7 @@ app.use('/api', surveyRouter);
 app.use('/api', optionRouter);
 app.use('/api', voteRouter);
 app.use('/api', objectionRouter);
+app.use('/api', adminRouter);
 
 // Error handler (must be last)
 app.use(errorHandler);

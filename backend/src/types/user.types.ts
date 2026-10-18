@@ -5,6 +5,9 @@ export interface User {
   display_name: string | null;
   created_at: string;
   updated_at: string;
+  failed_login_attempts: number;
+  locked_until: string | null;
+  last_login_at: string | null;
 }
 
 export interface UserPublic {
@@ -12,6 +15,20 @@ export interface UserPublic {
   username: string;
   display_name: string | null;
   created_at: string;
+  is_admin: boolean;
+}
+
+/** User row as shown in the user administration (no password hash). */
+export interface UserAdministrationEntry {
+  id: string;
+  username: string;
+  display_name: string | null;
+  created_at: string;
+  last_login_at: string | null;
+  failed_login_attempts: number;
+  locked_until: string | null;
+  is_locked: boolean;
+  is_admin: boolean;
 }
 
 export interface JwtPayload {

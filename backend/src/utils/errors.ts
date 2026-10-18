@@ -43,3 +43,10 @@ export class ConflictError extends AppError {
     this.name = 'ConflictError';
   }
 }
+
+export class AccountLockedError extends AppError {
+  constructor(message = 'Account is temporarily locked due to too many failed login attempts') {
+    super(message, 423, 'ACCOUNT_LOCKED');
+    this.name = 'AccountLockedError';
+  }
+}

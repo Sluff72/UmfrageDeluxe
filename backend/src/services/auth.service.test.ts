@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AuthService } from './auth.service';
 import { getDatabase } from '../config/database';
-import { ConflictError, UnauthorizedError } from '../utils/errors';
+import { AccountLockedError, ConflictError, UnauthorizedError } from '../utils/errors';
+import { MAX_FAILED_LOGIN_ATTEMPTS } from './loginLockout.service';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -106,6 +107,65 @@ describe('AuthService', () => {
           password: 'mypassword123',
         })
       ).rejects.toThrow(UnauthorizedError);
+    });
+  });
+
+  describe('per-account login lockout', () => {
+    const lockedUsername = 'lockme';
+    const otherUsername = 'bystander';
+    const password = 'correctpassword123';
+
+    beforeEach(async () => {
+      await authService.registerUser({ username: lockedUsername, password });
+      await authService.registerUser({ username: otherUsername, password });
+    });
+
+    async function failLoginRepeatedly(username: string, attempts: number) {
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        await authService.loginUser({ username, password: 'wrongpassword' }).catch(() => {});
+      }
+    }
+
+    it('should lock the account after too many failed attempts', async () => {
+      await failLoginRepeatedly(lockedUsername, MAX_FAILED_LOGIN_ATTEMPTS - 1);
+
+      await expect(
+        authService.loginUser({ username: lockedUsername, password: 'wrongpassword' })
+      ).rejects.toThrow(AccountLockedError);
+    });
+
+    it('should reject even the correct password while locked', async () => {
+      await failLoginRepeatedly(lockedUsername, MAX_FAILED_LOGIN_ATTEMPTS);
+
+      await expect(
+        authService.loginUser({ username: lockedUsername, password })
+      ).rejects.toThrow(AccountLockedError);
+    });
+
+    it('should not affect other accounts', async () => {
+      await failLoginRepeatedly(lockedUsername, MAX_FAILED_LOGIN_ATTEMPTS);
+
+      const result = await authService.loginUser({ username: otherUsername, password });
+      expect(result.user.username).toBe(otherUsername);
+    });
+
+    it('should reset the failure counter after a successful login', async () => {
+      await failLoginRepeatedly(lockedUsername, MAX_FAILED_LOGIN_ATTEMPTS - 1);
+      await authService.loginUser({ username: lockedUsername, password });
+      await failLoginRepeatedly(lockedUsername, MAX_FAILED_LOGIN_ATTEMPTS - 1);
+
+      const result = await authService.loginUser({ username: lockedUsername, password });
+      expect(result.user.username).toBe(lockedUsername);
+    });
+
+    it('should allow login again once the lock has expired', async () => {
+      await failLoginRepeatedly(lockedUsername, MAX_FAILED_LOGIN_ATTEMPTS);
+      getDatabase()
+        .prepare(`UPDATE users SET locked_until = datetime('now', '-1 minute') WHERE username = ?`)
+        .run(lockedUsername);
+
+      const result = await authService.loginUser({ username: lockedUsername, password });
+      expect(result.user.username).toBe(lockedUsername);
     });
   });
 

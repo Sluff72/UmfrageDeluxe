@@ -29,6 +29,8 @@ PORT=3001
 DATABASE_PATH=./data/umfrage.db
 CORS_ORIGIN=http://localhost:3000
 NODE_ENV=development
+# Optional: Benutzernamen mit Zugriff auf die Nutzerverwaltung (kommagetrennt)
+ADMIN_USERNAMES=heinz
 ```
 
 Dann starten:
@@ -110,6 +112,9 @@ JWT_SECRET=...
 
 # Deine Domain (wird für CORS verwendet)
 SITE_ADDRESS=umfrage.deinedomain.de
+
+# Benutzernamen mit Zugriff auf die Nutzerverwaltung (/admin/users), kommagetrennt
+ADMIN_USERNAMES=heinz
 ```
 
 ### Schritt 3: Stack starten
